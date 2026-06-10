@@ -1,6 +1,10 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import helmet from '@fastify/helmet'
+import {
+  validatorCompiler,
+  serializerCompiler,
+} from 'fastify-type-provider-zod'
 
 import { env } from './config/env.js'
 import {authRoutes} from './routes/auth.routes.js'
@@ -10,6 +14,9 @@ const buildApp = async () => {
   const fastify = Fastify({
     logger: true,
   })
+
+  fastify.setValidatorCompiler(validatorCompiler)
+  fastify.setSerializerCompiler(serializerCompiler)
 
   // Plugins
   await fastify.register(cors, {

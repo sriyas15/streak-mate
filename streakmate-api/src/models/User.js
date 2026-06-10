@@ -234,9 +234,8 @@ userSchema.index({ isDeleted: 1, isActive: 1 })
 
 // ─── Hash password before save ──────────────────────────────────────────────
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password') || !this.password) return next()
+  if (!this.isModified('password') || !this.password) return 
   this.password = await bcrypt.hash(this.password, 12)
-  next()
 })
 
 // ─── Compare password ───────────────────────────────────────────────────────
@@ -247,7 +246,6 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 // ─── Never return deleted users ─────────────────────────────────────────────
 userSchema.pre(/^find/, function (next) {
   this.where({ isDeleted: false })
-  next()
 })
 
 const User = mongoose.model('User', userSchema)
