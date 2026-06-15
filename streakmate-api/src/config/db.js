@@ -4,12 +4,11 @@ import { env } from './Env.js'
 const MONGODB_OPTIONS = {
   maxPoolSize: 10,        // max connections in pool
   serverSelectionTimeoutMS: 5000,  // fail fast if mongo not reachable
-  socketTimeoutMS: 45000
-  // family: 4,              // force IPv4
+  socketTimeoutMS: 45000,
+  family: 4,              // force IPv4
 }
 
 export const connectDB = async () => {
-  console.log(env.MONGODB_URI)
   try {
     const conn = await mongoose.connect(env.MONGODB_URI, MONGODB_OPTIONS)
     console.log(`✅ MongoDB connected: ${conn.connection.host}`)

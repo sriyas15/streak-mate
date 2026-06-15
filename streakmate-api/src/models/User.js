@@ -14,17 +14,16 @@ const userSchema = new mongoose.Schema(
     username: {
       type: String,
       required: [true, 'Username is required'],
-      unique: true,
       trim: true,
       lowercase: true,
       minlength: 3,
       maxlength: 30,
       match: [/^[a-z0-9_]+$/, 'Username can only contain letters, numbers and underscores'],
     },
+    
     email: {
       type: String,
       required: [true, 'Email is required'],
-      unique: true,
       lowercase: true,
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Invalid email format'],
