@@ -70,7 +70,7 @@ export const connectRedis = async () => {
     await redisSubscriber.connect()
   } catch (err) {
     console.error(`❌ Redis connection failed: ${err.message}`)
-    process.exit(1)
+    // process.exit(1)
   }
 }
 
@@ -86,39 +86,69 @@ export const disconnectRedis = async () => {
 /**
  * Set a value with optional TTL (seconds)
  */
+
+// export const setCache = async (key, value, ttlSeconds = null) => {
+//   const serialized = JSON.stringify(value)
+//   if (ttlSeconds) {
+//     await redis.set(key, serialized, 'EX', ttlSeconds)
+//   } else {
+//     await redis.set(key, serialized)
+//   }
+// }
+
+// /**
+//  * Get a parsed value by key. Returns null if not found.
+//  */
+// export const getCache = async (key) => {
+//   const data = await redis.get(key)
+//   return data ? JSON.parse(data) : null
+// }
+
+// /**
+//  * Delete a key
+//  */
+// export const deleteCache = async (key) => {
+//   await redis.del(key)
+// }
+
+// /**
+//  * Delete all keys matching a pattern
+//  * e.g. deletePattern("streak:userId:*")
+//  */
+// export const deletePattern = async (pattern) => {
+//   const keys = await redis.keys(pattern)
+//   if (keys.length > 0) {
+//     await redis.del(...keys)
+//   }
+// }
+
 export const setCache = async (key, value, ttlSeconds = null) => {
-  const serialized = JSON.stringify(value)
-  if (ttlSeconds) {
-    await redis.set(key, serialized, 'EX', ttlSeconds)
-  } else {
-    await redis.set(key, serialized)
-  }
+  try {
+    const serialized = JSON.stringify(value)
+    if (ttlSeconds) {
+      await redis.set(key, serialized, 'EX', ttlSeconds)
+    } else {
+      await redis.set(key, serialized)
+    }
+  } catch { /* ignore */ }
 }
 
-/**
- * Get a parsed value by key. Returns null if not found.
- */
 export const getCache = async (key) => {
-  const data = await redis.get(key)
-  return data ? JSON.parse(data) : null
+  try {
+    const data = await redis.get(key)
+    return data ? JSON.parse(data) : null
+  } catch { return null }
 }
 
-/**
- * Delete a key
- */
 export const deleteCache = async (key) => {
-  await redis.del(key)
+  try { await redis.del(key) } catch { /* ignore */ }
 }
 
-/**
- * Delete all keys matching a pattern
- * e.g. deletePattern("streak:userId:*")
- */
 export const deletePattern = async (pattern) => {
-  const keys = await redis.keys(pattern)
-  if (keys.length > 0) {
-    await redis.del(...keys)
-  }
+  try {
+    const keys = await redis.keys(pattern)
+    if (keys.length > 0) await redis.del(...keys)
+  } catch { /* ignore */ }
 }
 
 // ─── Cache key constants ────────────────────────────────────────────────────
