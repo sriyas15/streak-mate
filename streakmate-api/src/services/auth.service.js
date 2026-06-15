@@ -3,23 +3,9 @@ import crypto from 'crypto'
 import { User } from '../models/index.js'
 import { env } from '../config/env.js'
 import { setCache, deleteCache, CACHE_KEYS } from '../config/redis.js'
-
-// ─── Token helpers ───────────────────────────────────────────────────────────
-
-export const signAccessToken = (userId) =>
-  jwt.sign({ userId }, env.JWT_ACCESS_SECRET, { expiresIn: env.JWT_ACCESS_EXPIRES_IN })
-
-export const signRefreshToken = (userId) =>
-  jwt.sign({ userId }, env.JWT_REFRESH_SECRET, { expiresIn: env.JWT_REFRESH_EXPIRES_IN })
-
-export const verifyAccessToken = (token) =>
-  jwt.verify(token, env.JWT_ACCESS_SECRET)
-
-export const verifyRefreshToken = (token) =>
-  jwt.verify(token, env.JWT_REFRESH_SECRET)
+import { signAccessToken, signRefreshToken, verifyAccessToken, verifyRefreshToken } from '../utils/jwt.js'
 
 // ─── Auth service ────────────────────────────────────────────────────────────
-
 export const authService = {
   // ── Register ────────────────────────────────────────────────────
   register: async ({ name, username, email, password }) => {
@@ -89,7 +75,7 @@ export const authService = {
     })
 
     // Invalidate any cached profile
-    await deleteCache(CACHE_KEYS.userProfile(user._id))
+    // await deleteCache(CACHE_KEYS.userProfile(user._id))
 
     return {
       accessToken,

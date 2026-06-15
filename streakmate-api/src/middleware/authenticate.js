@@ -1,4 +1,4 @@
-import { verifyAccessToken } from '../services/auth.service.js'
+import { verifyAccessToken } from '../utils/jwt.js'
 import { User } from '../models/index.js'
 import { getCache, setCache, CACHE_KEYS, TTL } from '../config/redis.js'
 
@@ -19,10 +19,9 @@ export const authenticate = async (req, reply) => {
         code: 'AUTH_NO_TOKEN',
       })
     }
-
     const token = authHeader.split(' ')[1]
-
     let decoded
+    console.log('INCOMING TOKEN:', token)
     try {
       decoded = verifyAccessToken(token)
     } catch (err) {
@@ -30,7 +29,6 @@ export const authenticate = async (req, reply) => {
       const message = err.name === 'TokenExpiredError'
         ? 'Access token expired — please refresh'
         : 'Invalid token'
-
       return reply.code(401).send({ success: false, message, code })
     }
 
