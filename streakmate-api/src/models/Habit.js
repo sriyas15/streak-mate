@@ -35,6 +35,10 @@ const habitSchema = new mongoose.Schema(
       maxlength: 200,
       default: null,
     },
+    subtasks: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Subtask'
+  },
 
     // ─── Schedule ─────────────────────────────────────────────────
     frequency: {
