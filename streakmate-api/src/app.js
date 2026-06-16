@@ -7,8 +7,7 @@ import {
 } from 'fastify-type-provider-zod'
 
 import { env } from './config/env.js'
-import { authRoutes } from './routes/auth.routes.js'
-import { habitRoutes } from './routes/habit.routes.js'
+import { registerRoutes } from './routes/index.js'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
 
 const buildApp = async () => {
@@ -39,18 +38,9 @@ const buildApp = async () => {
   })
 
   // API routes
-  fastify.register(async (v1) => {
-      v1.register(authRoutes, {
-        prefix: '/auth',
-      }),
-      v1.register(habitRoutes,{
-        prefix:"/habits",
-      })
-    },
-    {
-      prefix: `/api/${env.API_VERSION}`,
-    }
-  )
+  fastify.register(registerRoutes, {
+    prefix: `/api/${env.API_VERSION}`,
+})
 
   // 404 handler
   fastify.setNotFoundHandler(notFoundHandler)

@@ -53,6 +53,7 @@ const envSchema = z.object({
   REDIS_URL: z
     .string()
     .optional(), // used in production (Railway / Render Redis URL)
+  REDIS_USERNAME: z.string().optional(),
 
   // ─── Firebase / FCM ───────────────────────────────────────────
   FIREBASE_PROJECT_ID: z
