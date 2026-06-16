@@ -7,6 +7,7 @@ export const streakController = {
     return reply.send({ success: true, data: { streak } })
   },
 
+  
   // GET /streaks/overall/history
   getOverallHistory: async (req, reply) => {
     const history = await streakService.getOverallHistory(req.user._id)
