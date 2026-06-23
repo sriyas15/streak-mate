@@ -34,8 +34,14 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  # assets:
-  #   - .env
-  #   - assets/images/
-  #   - assets/icons/
-  #   - assets/animations/
+  assets:
+    - .env
+    - assets/images/
+    - assets/icons/
+    - assets/animations/
+    - assets/images/bg3.png
+    - assets/images/island1.png
+    - assets/images/island2.png
+    - assets/images/island3.png
+    - assets/images/island4.png
+    - assets/images/island5.png

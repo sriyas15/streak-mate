@@ -98,6 +98,9 @@ class OnboardingRepository {
       final response = await _dio.post(
         ApiEndpoints.onboardingReminders,
         data: {'reminders': reminders},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+        ),
       );
       if (response.statusCode == 200 && response.data['success'] == true) return;
       throw ApiException(
@@ -113,7 +116,13 @@ class OnboardingRepository {
   /// Returns { user, habits } — habits include populated subtasks.
   Future<List<HabitModel>> complete() async {
     try {
-      final response = await _dio.post(ApiEndpoints.onboardingComplete);
+      final response = await _dio.post(
+        ApiEndpoints.onboardingComplete,
+        data: {},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+        ),
+      );
       if (response.statusCode == 200 && response.data['success'] == true) {
         final habitsJson = response.data['data']['habits'] as List;
         return habitsJson

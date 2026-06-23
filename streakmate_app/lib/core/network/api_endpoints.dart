@@ -40,4 +40,17 @@ class ApiEndpoints {
   static const String habitsToday = '/habits/today';
   static String habitById(String id) => '/habits/$id';
   static String habitSubtasks(String habitId) => '/habits/$habitId/subtasks';
+  static String subtaskById(String habitId, String subtaskId) =>
+      '/habits/$habitId/subtasks/$subtaskId';
+
+  // ─── Habit Logs ─────────────────────────────────────────────────────────
+  static String habitLogs(String habitId) => '/habits/$habitId/logs';
+  static String habitLogByDate(String habitId, String date) =>
+      '/habits/$habitId/logs/$date';
+  static String habitLogComplete(String habitId, String date) =>
+      '/habits/$habitId/logs/$date/complete';
+  static String habitLogUncomplete(String habitId, String date) =>
+      '/habits/$habitId/logs/$date/uncomplete';
+  static String habitLogSubtask(String habitId, String date, String subtaskId) =>
+      '/habits/$habitId/logs/$date/subtasks/$subtaskId';
 }

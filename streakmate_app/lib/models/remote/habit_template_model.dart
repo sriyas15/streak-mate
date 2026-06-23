@@ -1,12 +1,14 @@
+import 'package:flutter/material.dart';
+import '../../features/onboarding/widgets/goal_icon_widgets.dart';
 /// habit_template_model.dart
-/// Mirrors backend HABIT_TEMPLATES exactly (constants.js). These are static
-/// client-side mirrors used to render the onboarding UI instantly; the
-/// actual Habit + Subtask documents are created server-side by
-/// POST /onboarding/habits, which returns the real persisted habits
-/// (see OnboardingRepository.selectHabits).
+/// [GoalOption.icon] is now a Widget Function() — returns the custom
+/// painter icon for each goal. Pass icon() into GoalCard(icon: goal.icon()).
+
+// ─── SubtaskTemplate / HabitTemplate unchanged ───────────────────────────────
+
 class SubtaskTemplate {
   final String name;
-  final String inputType; // checkbox | quantity | timer | count
+  final String inputType;
   final String? unit;
   final num? targetValue;
   final bool isRequired;
@@ -25,7 +27,7 @@ class SubtaskTemplate {
 class HabitTemplate {
   final String category;
   final String name;
-  final String icon;
+  final String icon;      // still String emoji — used elsewhere in app
   final String colorHex;
   final List<SubtaskTemplate> subtasks;
 
@@ -38,9 +40,6 @@ class HabitTemplate {
   });
 }
 
-/// Static mirror of backend HABIT_TEMPLATES — used for instant onboarding
-/// UI render. Display only; never sent to the server. The server creates
-/// its own Habit/Subtask docs from its own copy of this data.
 const List<HabitTemplate> kHabitTemplates = [
   HabitTemplate(
     category: 'gym',
@@ -120,12 +119,13 @@ const List<HabitTemplate> kHabitTemplates = [
   ),
 ];
 
-/// Goal options for the Purpose screen (mirrors User.selectedGoal enum).
+// ─── GoalOption — icon is now a Widget builder ────────────────────────────────
+
 class GoalOption {
   final String value;
   final String title;
   final String subtitle;
-  final String icon;
+  final Widget Function() icon;   // ← changed from String to Widget builder
   final String colorHex;
 
   const GoalOption({
@@ -137,11 +137,49 @@ class GoalOption {
   });
 }
 
-const List<GoalOption> kGoalOptions = [
-  GoalOption(value: 'fitness', title: 'Get Fit', subtitle: 'Stronger body, stronger you.', icon: '💪', colorHex: '#1D9E75'),
-  GoalOption(value: 'spiritual', title: 'Spiritual Growth', subtitle: 'Strengthen your faith and inner peace.', icon: '🌙', colorHex: '#7F77DD'),
-  GoalOption(value: 'study', title: 'Study & Learn', subtitle: 'Learn more, achieve more.', icon: '📖', colorHex: '#BA7517'),
-  GoalOption(value: 'wellness', title: 'Live Healthy', subtitle: 'Better habits, better life.', icon: '❤️', colorHex: '#D85A30'),
-  GoalOption(value: 'productivity', title: 'Be Productive', subtitle: 'Focus, plan and get things done.', icon: '💼', colorHex: '#378ADD'),
-  GoalOption(value: 'overall', title: 'Something Else', subtitle: 'Create your own purpose.', icon: '✨', colorHex: '#1D9E75'),
+const double _kIconSize = 22;
+
+final List<GoalOption> kGoalOptions = [
+  GoalOption(
+    value: 'fitness',
+    title: 'Get Fit',
+    subtitle: 'Stronger body, stronger you.',
+    icon: () => const GetFitIcon(size: _kIconSize),
+    colorHex: '#1D9E75',
+  ),
+  GoalOption(
+    value: 'spiritual',
+    title: 'Spiritual Growth',
+    subtitle: 'Strengthen your faith and inner peace.',
+    icon: () => const SpiritualGrowthIcon(size: _kIconSize),
+    colorHex: '#7F77DD',
+  ),
+  GoalOption(
+    value: 'study',
+    title: 'Study & Learn',
+    subtitle: 'Learn more, achieve more.',
+    icon: () => const StudyLearnIcon(size: _kIconSize),
+    colorHex: '#BA7517',
+  ),
+  GoalOption(
+    value: 'wellness',
+    title: 'Live Healthy',
+    subtitle: 'Better habits, better life.',
+    icon: () => const LiveHealthyIcon(size: _kIconSize),
+    colorHex: '#D85A30',
+  ),
+  GoalOption(
+    value: 'productivity',
+    title: 'Be Productive',
+    subtitle: 'Focus, plan and get things done.',
+    icon: () => const BeProductiveIcon(size: _kIconSize),
+    colorHex: '#378ADD',
+  ),
+  GoalOption(
+    value: 'overall',
+    title: 'Something Else',
+    subtitle: 'Create your own purpose.',
+    icon: () => const SomethingElseIcon(size: _kIconSize),
+    colorHex: '#1D9E75',
+  ),
 ];

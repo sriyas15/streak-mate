@@ -103,10 +103,14 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
     state = state.copyWith(status: OnboardingSubmitStatus.submitting, errorMessage: null);
     try {
       await _repository.setGoal(state.selectedGoal!);
+      // Advance to step 3 locally so the router allows /onboarding/habits.
+      // Backend sets onboardingStep=2 after this call, but we optimistically
+      // move to 3 so the redirect guard (requestedStep <= step + 1) doesn't
+      // block the navigation to the habits screen.
       _ref.read(authProvider.notifier).updateUserOnboarding(
-            onboardingStep: 2,
-            selectedGoal: state.selectedGoal,
-          );
+        onboardingStep: 3,
+        selectedGoal: state.selectedGoal,
+      );
       state = state.copyWith(status: OnboardingSubmitStatus.idle);
       return true;
     } on ApiException catch (e) {
@@ -145,7 +149,7 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
         seeded[habit.id] = habit.subtasks.map((s) => s.id).toSet();
       }
 
-      _ref.read(authProvider.notifier).updateUserOnboarding(onboardingStep: 3);
+      _ref.read(authProvider.notifier).updateUserOnboarding(onboardingStep: 4);
       state = state.copyWith(
         status: OnboardingSubmitStatus.idle,
         habits: habits,
@@ -207,10 +211,10 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
         final customSubtasks = habit.subtasks
             .where((s) => s.id.startsWith('draft_') && enabled.contains(s.id))
             .map((s) => {
-                  'name': s.name,
-                  'inputType': s.inputType,
-                  'isRequired': false,
-                })
+          'name': s.name,
+          'inputType': s.inputType,
+          'isRequired': false,
+        })
             .toList();
         final realEnabledIds = enabled.where((id) => !id.startsWith('draft_')).toList();
 
@@ -222,7 +226,7 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
       }
 
       await _repository.configureSubtasks(payload);
-      _ref.read(authProvider.notifier).updateUserOnboarding(onboardingStep: 4);
+      _ref.read(authProvider.notifier).updateUserOnboarding(onboardingStep: 5);
       state = state.copyWith(status: OnboardingSubmitStatus.idle);
       return true;
     } on ApiException catch (e) {
@@ -262,9 +266,9 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
       await _repository.complete();
 
       _ref.read(authProvider.notifier).updateUserOnboarding(
-            onboardingStep: 5,
-            onboardingCompleted: true,
-          );
+        onboardingStep: 5,
+        onboardingCompleted: true,
+      );
       state = state.copyWith(status: OnboardingSubmitStatus.idle);
       return true;
     } on ApiException catch (e) {
@@ -279,9 +283,9 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
 }
 
 final onboardingRepositoryProvider =
-    Provider<OnboardingRepository>((ref) => OnboardingRepository());
+Provider<OnboardingRepository>((ref) => OnboardingRepository());
 
 final onboardingProvider =
-    StateNotifierProvider<OnboardingNotifier, OnboardingState>((ref) {
+StateNotifierProvider<OnboardingNotifier, OnboardingState>((ref) {
   return OnboardingNotifier(ref.watch(onboardingRepositoryProvider), ref);
 });
