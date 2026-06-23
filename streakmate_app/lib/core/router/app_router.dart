@@ -4,6 +4,11 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
+import '../../features/onboarding/screens/welcome_screen.dart';
+import '../../features/onboarding/screens/goal_selection_screen.dart';
+import '../../features/onboarding/screens/habit_selection_screen.dart';
+import '../../features/onboarding/screens/subtask_setup_screen.dart';
+import '../../features/onboarding/screens/reminder_setup_screen.dart';
 import 'route_names.dart';
 
 /// app_router.dart
@@ -39,8 +44,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (status == AuthStatus.authenticated) {
         final user = authState.user;
         if (user != null && !user.onboardingCompleted) {
-          if (state.matchedLocation.startsWith('/onboarding')) return null;
-          return _onboardingRouteForStep(user.onboardingStep);
+          final allowedRoute = _onboardingRouteForStep(user.onboardingStep);
+          final requestedStep = _stepForOnboardingRoute(state.matchedLocation);
+
+          if (state.matchedLocation.startsWith('/onboarding') &&
+              requestedStep != null) {
+            // Allow any step at or before the user's current server step,
+            // PLUS one step ahead — so "Continue" buttons can always
+            // advance forward before the server confirms the next step.
+            // The server step only updates after a successful API call,
+            // so blocking +1 navigation would freeze every "Continue" button.
+            if (requestedStep <= user.onboardingStep + 1) return null;
+          }
+          return allowedRoute;
         }
         // Onboarding complete — keep authenticated users out of auth screens.
         if (loggingInOrOut || state.matchedLocation == RouteNames.splash) {
@@ -65,19 +81,23 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RouteNames.onboardingWelcome,
-        builder: (context, state) => const _OnboardingPlaceholder(step: 'Welcome'),
+        builder: (context, state) => const WelcomeScreen(),
       ),
       GoRoute(
         path: RouteNames.onboardingGoal,
-        builder: (context, state) => const _OnboardingPlaceholder(step: 'Goal'),
+        builder: (context, state) => const GoalSelectionScreen(),
       ),
       GoRoute(
         path: RouteNames.onboardingHabits,
-        builder: (context, state) => const _OnboardingPlaceholder(step: 'Habits'),
+        builder: (context, state) => const HabitSelectionScreen(),
       ),
       GoRoute(
         path: RouteNames.onboardingSubtasks,
-        builder: (context, state) => const _OnboardingPlaceholder(step: 'Subtasks'),
+        builder: (context, state) => const SubtaskSetupScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.onboardingReminders,
+        builder: (context, state) => const ReminderSetupScreen(),
       ),
       GoRoute(
         path: RouteNames.home,
@@ -96,10 +116,32 @@ String _onboardingRouteForStep(int step) {
     case 3:
       return RouteNames.onboardingHabits;
     case 4:
-    case 5:
       return RouteNames.onboardingSubtasks;
+    case 5:
+      return RouteNames.onboardingReminders;
     default:
       return RouteNames.onboardingWelcome;
+  }
+}
+
+/// Reverse of _onboardingRouteForStep — used so the redirect guard can
+/// tell whether a requested /onboarding/* route is at or before the
+/// user's current server-confirmed step (allowed) or ahead of it
+/// (blocked, redirected back to their actual step).
+int? _stepForOnboardingRoute(String route) {
+  switch (route) {
+    case RouteNames.onboardingWelcome:
+      return 1;
+    case RouteNames.onboardingGoal:
+      return 2;
+    case RouteNames.onboardingHabits:
+      return 3;
+    case RouteNames.onboardingSubtasks:
+      return 4;
+    case RouteNames.onboardingReminders:
+      return 5;
+    default:
+      return null;
   }
 }
 
@@ -117,17 +159,6 @@ class _SplashScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       body: Center(child: CircularProgressIndicator()),
-    );
-  }
-}
-
-class _OnboardingPlaceholder extends StatelessWidget {
-  const _OnboardingPlaceholder({required this.step});
-  final String step;
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(child: Text('Onboarding: $step (to be built next)')),
     );
   }
 }

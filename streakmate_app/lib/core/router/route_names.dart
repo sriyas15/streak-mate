@@ -10,6 +10,7 @@ class RouteNames {
   static const String onboardingGoal = '/onboarding/goal';
   static const String onboardingHabits = '/onboarding/habits';
   static const String onboardingSubtasks = '/onboarding/subtasks';
+  static const String onboardingReminders = '/onboarding/reminders';
 
   static const String home = '/home';
 }

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../constants/app_constants.dart';
 import 'auth_interceptor.dart';
 
@@ -17,11 +18,25 @@ class DioClient {
         connectTimeout: AppConstants.connectTimeout,
         receiveTimeout: AppConstants.receiveTimeout,
         headers: const {'Content-Type': 'application/json'},
-        // Backend wraps everything in { success, message, data } — let
-        // non-2xx through to our error handling rather than throwing here.
         validateStatus: (status) => status != null && status < 500,
       ),
     );
+
+    // ── Debug logging — prints every request + response to Flutter console ──
+    // Automatically disabled in release builds via kDebugMode.
+    if (kDebugMode) {
+      _dio.interceptors.add(
+        LogInterceptor(
+          requestBody: true,
+          responseBody: true,
+          requestHeader: true,
+          responseHeader: false,
+          error: true,
+          logPrint: (obj) => debugPrint('[DIO] $obj'),
+        ),
+      );
+    }
+
     _dio.interceptors.add(AuthInterceptor(_dio));
   }
 
@@ -33,7 +48,6 @@ class DioClient {
   static String _resolveBaseUrl() {
     const fromDefine = String.fromEnvironment('API_BASE_URL', defaultValue: '');
     if (fromDefine.isNotEmpty) return fromDefine;
-
     // TODO(you): if using flutter_dotenv, replace the line below with:
     //   return dotenv.env['API_BASE_URL'] ?? AppConstants.apiBaseUrlFallback;
     return AppConstants.apiBaseUrlFallback;
