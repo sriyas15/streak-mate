@@ -1,6 +1,8 @@
 import buildApp from './src/app.js'
 import {connectDB} from './src/config/db.js'
 import { env } from './src/config/env.js'
+import dns from 'dns';
+dns.setServers(['8.8.8.8', '1.1.1.1']);
 
 const startServer = async () => {
   try {
