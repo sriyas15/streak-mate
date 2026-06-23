@@ -23,13 +23,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
 
   String? _nameError;
   String? _usernameError;
   String? _emailError;
   String? _passwordError;
-  String? _confirmPasswordError;
 
   @override
   void dispose() {
@@ -37,7 +35,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -47,26 +44,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _usernameError = Validators.username(_usernameController.text);
       _emailError = Validators.email(_emailController.text);
       _passwordError = Validators.password(_passwordController.text);
-      _confirmPasswordError = Validators.confirmPassword(
-        _confirmPasswordController.text,
-        _passwordController.text,
-      );
     });
+
     return _nameError == null &&
         _usernameError == null &&
         _emailError == null &&
-        _passwordError == null &&
-        _confirmPasswordError == null;
+        _passwordError == null;
   }
 
   void _submit() {
     if (!_validate()) return;
+
     ref.read(authProvider.notifier).register(
-          name: _nameController.text.trim(),
-          username: _usernameController.text.trim().toLowerCase(),
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
+      name: _nameController.text.trim(),
+      username: _usernameController.text.trim().toLowerCase(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
   }
 
   @override
@@ -79,7 +73,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.status == AuthStatus.error && next.errorMessage != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.errorMessage!), backgroundColor: AppColors.danger),
+          SnackBar(
+            content: Text(next.errorMessage!),
+            backgroundColor: AppColors.danger,
+          ),
         );
         ref.read(authProvider.notifier).clearError();
       }
@@ -95,12 +92,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             children: [
               IconButton(
                 onPressed: isLoading ? null : () => context.go(RouteNames.login),
-                icon: const Icon(Icons.arrow_back, color: AppColors.lightTextPrimary),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: AppColors.lightTextPrimary,
+                ),
                 padding: EdgeInsets.zero,
                 style: IconButton.styleFrom(alignment: Alignment.centerLeft),
               ),
               const SizedBox(height: 12),
-              const Text('Create your account', style: AppTextStyles.lightHeadline),
+              const Text(
+                'Create your account',
+                style: AppTextStyles.lightHeadline,
+              ),
               const SizedBox(height: 8),
               const Text(
                 'Small habits today, extraordinary life tomorrow.',
@@ -116,10 +119,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 errorText: _nameError,
                 autofillHints: const [AutofillHints.name],
                 onChanged: (_) {
-                  if (_nameError != null) setState(() => _nameError = null);
+                  if (_nameError != null) {
+                    setState(() => _nameError = null);
+                  }
                 },
               ),
               const SizedBox(height: 16),
+
               AuthTextField(
                 label: 'USERNAME',
                 controller: _usernameController,
@@ -127,10 +133,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 prefixIcon: Icons.alternate_email,
                 errorText: _usernameError,
                 onChanged: (_) {
-                  if (_usernameError != null) setState(() => _usernameError = null);
+                  if (_usernameError != null) {
+                    setState(() => _usernameError = null);
+                  }
                 },
               ),
               const SizedBox(height: 16),
+
               AuthTextField(
                 label: 'EMAIL',
                 controller: _emailController,
@@ -140,38 +149,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 errorText: _emailError,
                 autofillHints: const [AutofillHints.email],
                 onChanged: (_) {
-                  if (_emailError != null) setState(() => _emailError = null);
+                  if (_emailError != null) {
+                    setState(() => _emailError = null);
+                  }
                 },
               ),
               const SizedBox(height: 16),
+
               AuthTextField(
                 label: 'PASSWORD',
                 controller: _passwordController,
                 obscureText: true,
-                textInputAction: TextInputAction.next,
+                textInputAction: TextInputAction.done,
                 prefixIcon: Icons.lock_outline,
                 errorText: _passwordError,
                 autofillHints: const [AutofillHints.newPassword],
                 onChanged: (_) {
-                  if (_passwordError != null) setState(() => _passwordError = null);
-                },
-              ),
-              const SizedBox(height: 16),
-              AuthTextField(
-                label: 'CONFIRM PASSWORD',
-                controller: _confirmPasswordController,
-                obscureText: true,
-                textInputAction: TextInputAction.done,
-                prefixIcon: Icons.lock_outline,
-                errorText: _confirmPasswordError,
-                onChanged: (_) {
-                  if (_confirmPasswordError != null) {
-                    setState(() => _confirmPasswordError = null);
+                  if (_passwordError != null) {
+                    setState(() => _passwordError = null);
                   }
                 },
               ),
 
               const SizedBox(height: 28),
+
               AppButton(
                 label: 'Create account',
                 isLoading: isLoading,
@@ -179,6 +180,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
 
               const SizedBox(height: 20),
+
               Center(
                 child: GestureDetector(
                   onTap: isLoading ? null : () => context.go(RouteNames.login),
@@ -186,7 +188,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     text: TextSpan(
                       style: AppTextStyles.lightSubtitle,
                       children: [
-                        const TextSpan(text: 'Already have an account? '),
+                        const TextSpan(
+                          text: 'Already have an account? ',
+                        ),
                         TextSpan(
                           text: 'Log in',
                           style: AppTextStyles.lightSubtitle.copyWith(

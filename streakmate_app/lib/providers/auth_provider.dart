@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/network/api_exception.dart';
 import '../core/storage/secure_storage.dart';
@@ -67,6 +68,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String email,
     required String password,
   }) async {
+    if (state.status == AuthStatus.authenticating) return; // guard double-tap
     state = state.copyWith(status: AuthStatus.authenticating, errorMessage: null);
     try {
       final user = await _repository.register(
@@ -75,19 +77,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: email,
         password: password,
       );
+      debugPrint('[Auth] Register success — user: ${user.email}');
       state = state.copyWith(status: AuthStatus.authenticated, user: user);
     } on ApiException catch (e) {
+      debugPrint('[Auth] Register failed — ${e.statusCode}: ${e.message}');
       state = state.copyWith(status: AuthStatus.error, errorMessage: e.message);
+    } catch (e) {
+      debugPrint('[Auth] Register unexpected error — $e');
+      state = state.copyWith(status: AuthStatus.error, errorMessage: 'Something went wrong. Please try again.');
     }
   }
 
   Future<void> login({required String email, required String password}) async {
+    if (state.status == AuthStatus.authenticating) return; // guard double-tap
     state = state.copyWith(status: AuthStatus.authenticating, errorMessage: null);
     try {
       final user = await _repository.login(email: email, password: password);
+      debugPrint('[Auth] Login success — user: ${user.email}, onboarded: ${user.onboardingCompleted}');
       state = state.copyWith(status: AuthStatus.authenticated, user: user);
     } on ApiException catch (e) {
+      debugPrint('[Auth] Login failed — ${e.statusCode}: ${e.message}');
       state = state.copyWith(status: AuthStatus.error, errorMessage: e.message);
+    } catch (e) {
+      debugPrint('[Auth] Login unexpected error — $e');
+      state = state.copyWith(status: AuthStatus.error, errorMessage: 'Something went wrong. Please try again.');
     }
   }
 
