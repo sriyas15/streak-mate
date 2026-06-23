@@ -8,6 +8,6 @@ export const onboardingRoutes = async (fastify) => {
   fastify.post('/goal', { handler: onboardingController.setGoal })
   fastify.post('/habits', { handler: onboardingController.selectHabits })
   fastify.post('/subtasks', { handler: onboardingController.configureSubtasks })
-  fastify.post('/reminders', { handler: onboardingController.setReminders })
+  fastify.post('/reminders', {config: { rawBody: false },handler: onboardingController.setReminders,})
   fastify.post('/complete', { handler: onboardingController.complete })
 }

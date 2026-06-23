@@ -30,7 +30,7 @@ export const onboardingController = {
 
   // POST /onboarding/reminders  body: { reminders: [{ habitId, times[] }] }
   setReminders: async (req, reply) => {
-    const { reminders } = req.body
+    const { reminders = [] } = req.body ?? {}
     await onboardingService.setReminders(req.user._id, reminders)
     return reply.send({ success: true, message: 'Reminders set', data: { step: 5 } })
   },
