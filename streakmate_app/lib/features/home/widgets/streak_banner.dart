@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 
-/// streak_banner.dart
-/// The illustrated top section of the Home screen from image 2:
-///  - Dark gradient background
-///  - Illustrated tree/house scene (gradient placeholder — swap for asset)
-///  - Circular streak counter overlaid bottom-right of illustration
-///  - XP level progress bar below
 class StreakBanner extends StatelessWidget {
   const StreakBanner({
     super.key,
@@ -15,6 +9,7 @@ class StreakBanner extends StatelessWidget {
     required this.level,
     required this.xpPoints,
     required this.xpToNextLevel,
+    this.imagePath,
   });
 
   final String userName;
@@ -22,89 +17,62 @@ class StreakBanner extends StatelessWidget {
   final int level;
   final int xpPoints;
   final int xpToNextLevel;
+  final String? imagePath;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Illustrated scene card ─────────────────────────────────
-        Container(
-          height: 200,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF1A1040), Color(0xFF2D1F5E), Color(0xFF1A2744)],
+        ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: SizedBox(
+            height: 196,
+            width: double.infinity,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                imagePath != null
+                    ? Image.asset(imagePath!, fit: BoxFit.cover)
+                    : _GradientPlaceholder(userName: userName),
+                Positioned(
+                  left: 0, right: 0, bottom: 0, height: 80,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 16, right: 80, bottom: 14,
+                  child: Text(
+                    '"Discipline today, freedom tomorrow."',
+                    style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.white.withOpacity(0.75)),
+                    maxLines: 2,
+                  ),
+                ),
+                Positioned(
+                  right: 14, bottom: 10,
+                  child: _StreakCircle(days: streakDays),
+                ),
+              ],
             ),
           ),
-          clipBehavior: Clip.antiAlias,
-          child: Stack(
-            children: [
-              // Stars / ambient particles
-              ..._buildStars(),
-              // Illustrated scene placeholder — replace with:
-              // Image.asset('assets/images/home_scene.png', fit: BoxFit.cover)
-              const _ScenePlaceholder(),
-              // Greeting overlay top-left
-              Positioned(
-                top: 16,
-                left: 18,
-                right: 80,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Good ${_greeting()}, $userName! 👋',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Let\'s make today count.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.65),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Streak circle — bottom right
-              Positioned(
-                bottom: 16,
-                right: 18,
-                child: _StreakCircle(days: streakDays),
-              ),
-              // Quote overlay bottom left
-              Positioned(
-                bottom: 18,
-                left: 18,
-                right: 90,
-                child: Text(
-                  '"Discipline today, freedom tomorrow."',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.white.withOpacity(0.55),
-                  ),
-                  maxLines: 2,
-                ),
-              ),
-            ],
-          ),
         ),
-        const SizedBox(height: 14),
-        // ── XP level progress bar ──────────────────────────────────
+        const SizedBox(height: 12),
         _XpBar(level: level, xp: xpPoints, xpMax: xpToNextLevel),
       ],
     );
   }
+}
+
+class _GradientPlaceholder extends StatelessWidget {
+  const _GradientPlaceholder({required this.userName});
+  final String userName;
 
   String _greeting() {
     final h = DateTime.now().hour;
@@ -113,29 +81,66 @@ class StreakBanner extends StatelessWidget {
     return 'evening';
   }
 
-  List<Widget> _buildStars() {
-    final positions = [
-      const Offset(0.15, 0.12),
-      const Offset(0.45, 0.08),
-      const Offset(0.75, 0.18),
-      const Offset(0.88, 0.35),
-      const Offset(0.3, 0.25),
-      const Offset(0.6, 0.30),
-    ];
-    return positions.map((p) {
-      return Positioned(
-        left: p.dx * 360,
-        top: p.dy * 200,
-        child: Container(
-          width: 2,
-          height: 2,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-          ),
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1A1040), Color(0xFF2D1F5E), Color(0xFF1A2744)],
         ),
-      );
-    }).toList();
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -30, right: -30,
+            child: Container(
+              width: 160, height: 160,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(colors: [AppColors.prayerPurple.withOpacity(0.3), Colors.transparent]),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -20, left: 40,
+            child: Container(
+              width: 100, height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(colors: [AppColors.welfareBlue.withOpacity(0.25), Colors.transparent]),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 20, left: 18,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Good ${_greeting()}, $userName! 👋',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+                const SizedBox(height: 4),
+                Text('Let\'s make today count.',
+                    style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.6))),
+              ],
+            ),
+          ),
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 20),
+                Icon(Icons.image_outlined, size: 32, color: Colors.white.withOpacity(0.12)),
+                const SizedBox(height: 6),
+                Text('Drop home_scene.png here',
+                    style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.18))),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -146,8 +151,7 @@ class _StreakCircle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 68,
-      height: 68,
+      width: 66, height: 66,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: const LinearGradient(
@@ -155,33 +159,15 @@ class _StreakCircle extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [Color(0xFFF2A33D), Color(0xFFE8762B)],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.flameOrange.withOpacity(0.5),
-            blurRadius: 16,
-            spreadRadius: 2,
-          ),
-        ],
+        border: Border.all(color: Colors.black.withOpacity(0.3), width: 2),
+        boxShadow: [BoxShadow(color: AppColors.flameOrange.withOpacity(0.55), blurRadius: 18, spreadRadius: 2)],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            '$days',
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              height: 1,
-            ),
-          ),
-          Text(
-            'Day Streak',
-            style: TextStyle(
-              fontSize: 9,
-              color: Colors.white.withOpacity(0.85),
-            ),
-          ),
+          const Text('🔥', style: TextStyle(fontSize: 18, height: 1)),
+          Text('$days', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white, height: 1)),
+          Text('days', style: TextStyle(fontSize: 8, color: Colors.white.withOpacity(0.85))),
         ],
       ),
     );
@@ -198,129 +184,51 @@ class _XpBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final progress = xpMax > 0 ? (xp / xpMax).clamp(0.0, 1.0) : 0.0;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
         color: AppColors.darkSurface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.darkBorder),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Text('⛰️', style: TextStyle(fontSize: 14)),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Level $level',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.darkTextPrimary,
-                    ),
-                  ),
-                ],
-              ),
-              Text(
-                '$xp / $xpMax XP',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.darkTextSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 6,
-              backgroundColor: AppColors.darkBorder,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.xpGold),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [Color(0xFFF2A33D), Color(0xFFE8762B)]),
+              borderRadius: BorderRadius.circular(10),
             ),
+            child: Text('Lv $level',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: progress, minHeight: 7,
+                    backgroundColor: AppColors.darkBorder,
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.xpGold),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text('$xp / $xpMax XP',
+                    style: const TextStyle(fontSize: 10, color: AppColors.darkTextSecondary)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            children: [
+              const Text('🎁', style: TextStyle(fontSize: 18)),
+              Text('Next', style: TextStyle(fontSize: 9, color: Colors.white.withOpacity(0.4))),
+            ],
           ),
         ],
       ),
     );
   }
-}
-
-/// Painted placeholder for the illustrated home scene.
-/// Replace with Image.asset once real art is added.
-class _ScenePlaceholder extends StatelessWidget {
-  const _ScenePlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: const Size(double.infinity, 200),
-      painter: _ScenePainter(),
-    );
-  }
-}
-
-class _ScenePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Ground
-    final groundPaint = Paint()..color = const Color(0xFF1A3318);
-    canvas.drawRect(
-      Rect.fromLTRB(0, size.height * 0.65, size.width, size.height),
-      groundPaint,
-    );
-    // Tree trunk
-    final trunkPaint = Paint()..color = const Color(0xFF5C3A1E);
-    canvas.drawRect(
-      Rect.fromLTWH(size.width * 0.38, size.height * 0.40, 18, size.height * 0.30),
-      trunkPaint,
-    );
-    // Tree canopy — layered circles (purple glowing tree from image 2)
-    final canopyColors = [
-      const Color(0xFF6B48C2),
-      const Color(0xFF8B5CF6),
-      const Color(0xFFA78BFA),
-    ];
-    final canopyCenters = [
-      Offset(size.width * 0.47, size.height * 0.30),
-      Offset(size.width * 0.38, size.height * 0.38),
-      Offset(size.width * 0.56, size.height * 0.36),
-    ];
-    final canopyRadii = [38.0, 28.0, 24.0];
-    for (var i = 0; i < 3; i++) {
-      canvas.drawCircle(
-        canopyCenters[i],
-        canopyRadii[i],
-        Paint()
-          ..color = canopyColors[i]
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-      );
-    }
-    // House
-    final housePaint = Paint()..color = const Color(0xFF2D4A3E);
-    canvas.drawRect(
-      Rect.fromLTWH(size.width * 0.62, size.height * 0.52, 55, 40),
-      housePaint,
-    );
-    // Roof
-    final roofPath = Path()
-      ..moveTo(size.width * 0.60, size.height * 0.52)
-      ..lineTo(size.width * 0.645, size.height * 0.38)
-      ..lineTo(size.width * 0.695, size.height * 0.52)
-      ..close();
-    canvas.drawPath(roofPath, Paint()..color = const Color(0xFF1A3A2E));
-    // Window glow
-    canvas.drawRect(
-      Rect.fromLTWH(size.width * 0.645, size.height * 0.56, 14, 12),
-      Paint()
-        ..color = const Color(0xFFF2C94C).withOpacity(0.8)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
