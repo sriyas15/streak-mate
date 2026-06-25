@@ -11,13 +11,6 @@ import '../widgets/step_indicator.dart';
 import '../widgets/subtask_tile.dart';
 
 /// subtask_setup_screen.dart
-/// Onboarding step 4/4 — combined view of ALL selected habits' subtasks
-/// (per your call: one screen, not a per-habit stepper). Each habit gets
-/// its own section header + colored subtask list, matching the
-/// "Setup Workout" card style but stacked for every selected habit.
-///
-/// Maps to POST /onboarding/subtasks
-/// body: { habitSubtasks: [{ habitId, enabledSubtaskIds, customSubtasks? }] }
 class SubtaskSetupScreen extends ConsumerWidget {
   const SubtaskSetupScreen({super.key});
 
@@ -25,6 +18,13 @@ class SubtaskSetupScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(onboardingProvider);
     final isSubmitting = state.status == OnboardingSubmitStatus.submitting;
+
+    // Dynamically grab the first habit to theme the header like the mockup ("Workout")
+    final dynamicTitle = state.habits.isNotEmpty ? state.habits.first.name : 'tasks';
+    final dynamicIcon = state.habits.isNotEmpty ? state.habits.first.icon : '✨';
+    final dynamicColor = state.habits.isNotEmpty 
+        ? Color(int.parse(state.habits.first.color.replaceFirst('#', '0xFF'))) 
+        : const Color(0xFF7D5BC7); // Fallback Purple
 
     ref.listen<OnboardingState>(onboardingProvider, (previous, next) {
       if (next.status == OnboardingSubmitStatus.error && next.errorMessage != null) {
@@ -43,109 +43,194 @@ class SubtaskSetupScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3EEFB),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: Row(
-                children: [
-                  const StepIndicator(current: 4, total: 4),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: isSubmitting ? null : () => context.go(RouteNames.onboardingHabits),
-                    icon: const Icon(Icons.arrow_back, color: AppColors.lightTextPrimary),
-                  ),
-                ],
-              ),
+      body: Stack(
+        children: [
+          // 1. Background Image Layer
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/bg4.png', // Ensure this image is added to your assets folder
+              fit: BoxFit.cover,
             ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RichText(
-                    text: const TextSpan(
-                      style: AppTextStyles.lightHeadline,
-                      children: [
-                        TextSpan(text: 'Set up your '),
-                        TextSpan(text: 'tasks', style: TextStyle(color: AppColors.prayerPurple)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Choose the sub-tasks you want to include.',
-                    style: AppTextStyles.lightSubtitle,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: state.habits.length,
-                itemBuilder: (context, habitIndex) {
-                  final habit = state.habits[habitIndex];
-                  final color = Color(int.parse(habit.color.replaceFirst('#', '0xFF')));
-                  final enabled = state.enabledSubtaskIds[habit.id] ?? {};
+          ),
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 22),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: Row(
+                    children: [
+                      const StepIndicator(current: 4, total: 4),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: isSubmitting ? null : () => context.go(RouteNames.onboardingHabits),
+                        icon: const Icon(Icons.arrow_back, color: AppColors.lightTextPrimary),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                
+                // 2. Centered Header Section
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text.rich(
+                        TextSpan(
                           children: [
-                            Text(habit.icon, style: const TextStyle(fontSize: 20)),
-                            const SizedBox(width: 8),
-                            Text(
-                              habit.name,
-                              style: AppTextStyles.lightCardTitle.copyWith(fontSize: 16),
+                            const TextSpan(
+                              text: 'Set up your\n',
+                              style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.black87,
+                                height: 1.2,
+                              ),
+                            ),
+                            TextSpan(
+                              text: '$dynamicTitle ',
+                              style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w800,
+                                color: dynamicColor, // Uses the habit's color (purple for workout)
+                                height: 1.2,
+                              ),
+                            ),
+                            TextSpan(
+                              text: dynamicIcon,
+                              style: const TextStyle(fontSize: 28),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
-                        ...habit.subtasks.map((subtask) {
-                          final meta = _metaLabel(subtask);
-                          return SubtaskTile(
-                            icon: _iconForInputType(subtask.inputType),
-                            name: subtask.name,
-                            metaLabel: meta,
-                            enabled: enabled.contains(subtask.id),
-                            color: color,
-                            isOptionalLabel: !subtask.isRequired,
-                            onToggle: () => ref
-                                .read(onboardingProvider.notifier)
-                                .toggleSubtask(habit.id, subtask.id),
-                          );
-                        }),
-                        _AddCustomSubtaskRow(
-                          color: color,
-                          onAdd: (name) => ref
-                              .read(onboardingProvider.notifier)
-                              .addCustomSubtaskDraft(habit.id, name),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Choose the sub-tasks you want\nto include.',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.black54,
+                          fontWeight: FontWeight.w500,
                         ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // 3. Subtask List
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: state.habits.length,
+                    itemBuilder: (context, habitIndex) {
+                      final habit = state.habits[habitIndex];
+                      final color = Color(int.parse(habit.color.replaceFirst('#', '0xFF')));
+                      final enabled = state.enabledSubtaskIds[habit.id] ?? {};
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 22),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Only show habit header if multiple habits were selected
+                            if (state.habits.length > 1) ...[
+                              Row(
+                                children: [
+                                  Text(habit.icon, style: const TextStyle(fontSize: 20)),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    habit.name,
+                                    style: AppTextStyles.lightCardTitle.copyWith(fontSize: 16),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            ...habit.subtasks.map((subtask) {
+                              final meta = _metaLabel(subtask);
+                              return SubtaskTile(
+                                icon: _iconForInputType(subtask.inputType),
+                                name: subtask.name,
+                                metaLabel: meta,
+                                enabled: enabled.contains(subtask.id),
+                                color: color,
+                                isOptionalLabel: !subtask.isRequired,
+                                onToggle: () => ref
+                                    .read(onboardingProvider.notifier)
+                                    .toggleSubtask(habit.id, subtask.id),
+                              );
+                            }),
+                            _AddCustomSubtaskRow(
+                              color: color,
+                              onAdd: (name) => ref
+                                  .read(onboardingProvider.notifier)
+                                  .addCustomSubtaskDraft(habit.id, name),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                // 4. Streak Protection Banner (Static UI from Mockup)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      // Shield Icon Background
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7D5BC7).withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.shield, color: Color(0xFF7D5BC7), size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Streak Protection',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.black87),
+                            ),
+                            Text(
+                              'Miss a day? Use Freeze Day\nand keep your streak alive.',
+                              style: TextStyle(fontSize: 11, color: Colors.black54, height: 1.2),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.ac_unit, color: Color(0xFF90A4E2), size: 28), // Snowflake Icon
+                    ],
+                  ),
+                ),
+                
+                // 5. Final Bottom Action Button
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                  child: AppButton(
+                    label: "All Set! Let's Go 🚀", // Updated Text
+                    isLoading: isSubmitting,
+                    backgroundColor: const Color(0xFF7D5BC7), // Deep purple from mockup
+                    onPressed: handleContinue,
+                  ),
+                ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-              child: AppButton(
-                label: 'Continue',
-                isLoading: isSubmitting,
-                backgroundColor: AppColors.prayerPurple,
-                onPressed: handleContinue,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -208,23 +293,25 @@ class _AddCustomSubtaskRowState extends State<_AddCustomSubtaskRow> {
       return GestureDetector(
         onTap: () => setState(() => _expanded = true),
         child: Container(
-          margin: const EdgeInsets.only(top: 4),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          margin: const EdgeInsets.only(top: 4, bottom: 8),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            border: Border.all(color: AppColors.lightCardBorder, style: BorderStyle.solid),
+            color: Colors.white.withOpacity(0.4), // Soft transparent background
+            border: Border.all(color: widget.color.withOpacity(0.2), width: 1.5),
             borderRadius: BorderRadius.circular(14),
           ),
           alignment: Alignment.center,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.add, size: 18, color: widget.color),
-              const SizedBox(width: 6),
+              Icon(Icons.add, size: 20, color: widget.color),
+              const SizedBox(width: 8),
               Text(
                 'Add custom sub-task',
-                style: AppTextStyles.lightCardSubtitle.copyWith(
+                style: TextStyle(
                   color: widget.color,
                   fontWeight: FontWeight.w600,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -234,10 +321,10 @@ class _AddCustomSubtaskRowState extends State<_AddCustomSubtaskRow> {
     }
 
     return Container(
-      margin: const EdgeInsets.only(top: 4),
+      margin: const EdgeInsets.only(top: 4, bottom: 8),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppColors.lightCard,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: widget.color),
       ),

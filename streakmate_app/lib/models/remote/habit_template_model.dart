@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../features/onboarding/widgets/goal_icon_widgets.dart';
+
 /// habit_template_model.dart
 /// [GoalOption.icon] is now a Widget Function() — returns the custom
 /// painter icon for each goal. Pass icon() into GoalCard(icon: goal.icon()).
@@ -64,7 +65,7 @@ const List<HabitTemplate> kHabitTemplates = [
       SubtaskTemplate(name: 'Asr', inputType: 'checkbox', isRequired: true, displayOrder: 2),
       SubtaskTemplate(name: 'Maghrib', inputType: 'checkbox', isRequired: true, displayOrder: 3),
       SubtaskTemplate(name: 'Isha', inputType: 'checkbox', isRequired: true, displayOrder: 4),
-      SubtaskTemplate(name: 'Quran reading (min. 1 page)', inputType: 'count', unit: 'pages', targetValue: 1, isRequired: false, displayOrder: 5),
+      SubtaskTemplate(name: 'Quran reading (min. 1 page)', inputType: 'quantity', unit: 'pages', targetValue: 1, isRequired: false, displayOrder: 5),
       SubtaskTemplate(name: 'Morning adhkar', inputType: 'checkbox', isRequired: false, displayOrder: 6),
       SubtaskTemplate(name: 'Evening adhkar', inputType: 'checkbox', isRequired: false, displayOrder: 7),
       SubtaskTemplate(name: 'Dua session', inputType: 'checkbox', isRequired: false, displayOrder: 8),
@@ -81,7 +82,7 @@ const List<HabitTemplate> kHabitTemplates = [
       SubtaskTemplate(name: 'Study / deep work session', inputType: 'timer', unit: 'min', targetValue: 60, isRequired: true, displayOrder: 0),
       SubtaskTemplate(name: 'Assignment / task completed', inputType: 'checkbox', isRequired: true, displayOrder: 1),
       SubtaskTemplate(name: 'Notes revised', inputType: 'checkbox', isRequired: false, displayOrder: 2),
-      SubtaskTemplate(name: 'Practice problems', inputType: 'quantity', unit: 'Qs', isRequired: false, displayOrder: 3),
+      SubtaskTemplate(name: 'Practice problems', inputType: 'quantity', unit: 'reps', isRequired: false, displayOrder: 3),
     ],
   ),
   HabitTemplate(
@@ -142,7 +143,7 @@ const double _kIconSize = 22;
 final List<GoalOption> kGoalOptions = [
   GoalOption(
     value: 'fitness',
-    title: 'Get Fit',
+    title: 'Fitness Enthusiast',
     subtitle: 'Stronger body, stronger you.',
     icon: () => const GetFitIcon(size: _kIconSize),
     colorHex: '#1D9E75',
@@ -156,29 +157,22 @@ final List<GoalOption> kGoalOptions = [
   ),
   GoalOption(
     value: 'study',
-    title: 'Study & Learn',
+    title: 'The Student / Learner',
     subtitle: 'Learn more, achieve more.',
     icon: () => const StudyLearnIcon(size: _kIconSize),
     colorHex: '#BA7517',
   ),
   GoalOption(
-    value: 'wellness',
-    title: 'Live Healthy',
-    subtitle: 'Better habits, better life.',
-    icon: () => const LiveHealthyIcon(size: _kIconSize),
-    colorHex: '#D85A30',
-  ),
-  GoalOption(
     value: 'productivity',
-    title: 'Be Productive',
+    title: 'The Busy Professional',
     subtitle: 'Focus, plan and get things done.',
     icon: () => const BeProductiveIcon(size: _kIconSize),
     colorHex: '#378ADD',
   ),
   GoalOption(
     value: 'overall',
-    title: 'Something Else',
-    subtitle: 'Create your own purpose.',
+    title: 'The Self-Improver',
+    subtitle: 'Increase your overall well-being.',
     icon: () => const SomethingElseIcon(size: _kIconSize),
     colorHex: '#1D9E75',
   ),
