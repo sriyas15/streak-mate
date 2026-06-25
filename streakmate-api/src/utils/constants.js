@@ -60,7 +60,7 @@ export const HABIT_TEMPLATES = [
       { name: 'Asr', inputType: 'checkbox', isRequired: true, displayOrder: 2 },
       { name: 'Maghrib', inputType: 'checkbox', isRequired: true, displayOrder: 3 },
       { name: 'Isha', inputType: 'checkbox', isRequired: true, displayOrder: 4 },
-      { name: 'Quran reading (min. 1 page)', inputType: 'count', unit: 'pages', targetValue: 1, isRequired: false, displayOrder: 5 },
+      { name: 'Quran reading (min. 1 page)', inputType: 'quantity', unit: 'pages', targetValue: 1, isRequired: false, displayOrder: 5 },
       { name: 'Morning adhkar', inputType: 'checkbox', isRequired: false, displayOrder: 6 },
       { name: 'Evening adhkar', inputType: 'checkbox', isRequired: false, displayOrder: 7 },
       { name: 'Dua session', inputType: 'checkbox', isRequired: false, displayOrder: 8 },
@@ -77,7 +77,7 @@ export const HABIT_TEMPLATES = [
       { name: 'Study / deep work session', inputType: 'timer', unit: 'min', targetValue: 60, isRequired: true, displayOrder: 0 },
       { name: 'Assignment / task completed', inputType: 'checkbox', isRequired: true, displayOrder: 1 },
       { name: 'Notes revised', inputType: 'checkbox', isRequired: false, displayOrder: 2 },
-      { name: 'Practice problems', inputType: 'quantity', unit: 'Qs', isRequired: false, displayOrder: 3 },
+      { name: 'Practice problems', inputType: 'quantity', unit: 'reps', isRequired: false, displayOrder: 3 },
     ],
   },
   {

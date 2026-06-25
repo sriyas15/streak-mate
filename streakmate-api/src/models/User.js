@@ -58,7 +58,7 @@ const userSchema = new mongoose.Schema(
     },
     selectedGoal: {
       type: String,
-      enum: ['fitness', 'spiritual', 'study', 'productivity', 'wellness', 'overall'],
+      enum: ['fitness', 'spiritual', 'study', 'productivity', 'overall'],
       default: null,
     },
 
