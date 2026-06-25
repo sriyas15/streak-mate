@@ -29,7 +29,6 @@ class AppConstants {
     'spiritual',
     'study',
     'productivity',
-    'wellness',
     'overall',
   ];
 
