@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/constants/app_colors.dart';
+import '../../../core/constants/app_colors.dart';
 
 class JourneyScreen extends StatelessWidget {
   const JourneyScreen({super.key});
@@ -50,7 +50,7 @@ class _Placeholder extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
                 color: AppColors.darkTextPrimary,
@@ -59,7 +59,7 @@ class _Placeholder extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 color: AppColors.darkTextSecondary,
               ),
