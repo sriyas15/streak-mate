@@ -7,13 +7,17 @@ import '../../../providers/home_provider.dart';
 import '../../../repositories/subtask_repository.dart';
 import '../../../shared/widgets/bottom_nav_bar.dart';
 import '../widgets/habit_list_tile.dart';
-import '../widgets/today_progress_card.dart';
-import 'placeholder_screens.dart';
+import '../widgets/streak_banner.dart';
+import '../../journey/screens/journey_screen.dart';
+import '../../friends/screens/friends_screen.dart';
+import '../../profile/screens/profile_screen.dart';
+
+// The exact glowing orange color from the Home UI progress and highlights
+const Color _uiOrange = Color(0xFFE5C07A);
 
 /// home_screen.dart
 /// Shell screen that owns the 5-tab navigator.
 /// The home tab (index 0) renders the dark gamified dashboard
-/// matching the beautiful UI design.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -24,7 +28,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
 
-  static const _tabs = [
+  final List<Widget> _tabs = const [
     _HomeTab(),
     JourneyScreen(),
     // index 2 is the FAB — no screen
@@ -41,7 +45,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0B14), // Deep dark background from UI
+      backgroundColor: AppColors.darkBg, // Deep dark background from UI
       body: IndexedStack(
         index: _tabIndex(_currentIndex),
         children: _tabs,
@@ -91,40 +95,26 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
       }
     });
 
-    final firstName = user?.name.split(' ').first ?? 'Riyas';
+    final firstName = user?.name.split(' ').first ?? 'Riyan';
     final streak = user?.currentStreakDays ?? 28;
 
-    // Removed the global SafeArea so the top hero can extend to the very top edge
     return RefreshIndicator(
-      color: const Color(0xFFE5A663), // Star/Flame Orange
+      color: _uiOrange, // Updated to exact UI orange color
       backgroundColor: const Color(0xFF1E1A2D),
       onRefresh: () => ref.read(homeProvider.notifier).refresh(),
       child: CustomScrollView(
         slivers: [
-          // ── Unified Top Hero Section (App Bar + Tree/Home + Streak) ────
+          // ── Unified Top Hero Section (App Bar + Tree + Quote/Streak + Journey) ────
           SliverToBoxAdapter(
             child: _TopHeroSection(
               firstName: firstName,
               streakDays: streak,
               hasAvatar: user?.name.isNotEmpty ?? false,
+              habits: homeState.status == HomeStatus.loaded ? homeState.habits : [],
             ),
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-          // ── Today's Journey ──────────────────────────────────────────
-          if (homeState.status == HomeStatus.loaded && homeState.habits.isNotEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: TodayProgressCard(
-                  habits: homeState.habits,
-                  onHabitTap: (_) {}, 
-                ),
-              ),
-            ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
           // ── Star Quote Card ──────────────────────────────────────────
           const SliverToBoxAdapter(
@@ -136,17 +126,41 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
 
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
 
-          // ── Section header for vertical list (Optional/Scrollable) ───
+          // ── Section header for vertical list ─────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'Your Habits',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white.withOpacity(0.9),
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Your Habits',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  if (homeState.allDone)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.success.withOpacity(0.4)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.check_circle, size: 13, color: AppColors.success),
+                          SizedBox(width: 4),
+                          Text(
+                            'All done!',
+                            style: TextStyle(fontSize: 12, color: AppColors.success),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -155,25 +169,61 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
           // ── Vertical Habit List ──────────────────────────────────────
           if (homeState.status == HomeStatus.loading)
             const SliverToBoxAdapter(
-              child: Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator())),
+              child: Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator(color: _uiOrange))),
             )
-          else if (homeState.habits.isNotEmpty)
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final habit = homeState.habits[index];
-                    return _HabitCardWithSubtasks(
-                      habit: habit,
-                      isLoading: homeState.loadingHabitIds.contains(habit.id),
-                      initiallyExpanded: index == 0,
-                    );
-                  },
-                  childCount: homeState.habits.length,
+          else if (homeState.status == HomeStatus.error)
+            SliverToBoxAdapter(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      const Text('😕', style: TextStyle(fontSize: 40)),
+                      const SizedBox(height: 12),
+                      Text(
+                        homeState.errorMessage ?? 'Something went wrong',
+                        style: const TextStyle(color: AppColors.darkTextSecondary),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: () => ref.read(homeProvider.notifier).loadToday(),
+                        child: const Text('Retry', style: TextStyle(color: _uiOrange)),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+            )
+          else if (homeState.habits.isEmpty && homeState.status == HomeStatus.loaded)
+              const SliverToBoxAdapter(
+                child: Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(40),
+                    child: Text(
+                      'No habits scheduled for today 🎉',
+                      style: TextStyle(color: AppColors.darkTextSecondary),
+                    ),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                      final habit = homeState.habits[index];
+                      return _HabitCardWithSubtasks(
+                        habit: habit,
+                        isLoading: homeState.loadingHabitIds.contains(habit.id),
+                        initiallyExpanded: index == 0,
+                      );
+                    },
+                    childCount: homeState.habits.length,
+                  ),
+                ),
+              ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),
@@ -186,27 +236,30 @@ class _TopHeroSection extends StatelessWidget {
   final String firstName;
   final int streakDays;
   final bool hasAvatar;
+  final List<TodayHabitModel> habits;
 
   const _TopHeroSection({
     required this.firstName,
     required this.streakDays,
     required this.hasAvatar,
+    required this.habits,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Container wraps its content size, stretching background natively
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
         image: DecorationImage(
           image: AssetImage('assets/images/homeScreen.png'), // <-- YOUR TREE+HOME IMAGE
-          fit: BoxFit.cover,
+          fit: BoxFit.cover, // Ensures image expands to fit all dynamic inner content
           alignment: Alignment.topCenter,
         ),
       ),
       child: Stack(
         children: [
-          // Gradient overlay to seamlessly fade the image into the dark background
+          // Gradient overlay to seamlessly fade the image into the dark background at the bottom
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -215,25 +268,28 @@ class _TopHeroSection extends StatelessWidget {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    const Color(0xFF0D0B14).withOpacity(0.5),
-                    const Color(0xFF0D0B14),
+                    AppColors.darkBg.withOpacity(0.6),
+                    AppColors.darkBg,
                   ],
-                  stops: const [0.4, 0.8, 1.0],
+                  stops: const [0.4, 0.85, 1.0],
                 ),
               ),
             ),
           ),
-          
+
+          // --- Content Structure ---
           SafeArea(
             bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // --- App Bar ---
-                  Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. App Bar (Top)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
@@ -246,6 +302,7 @@ class _TopHeroSection extends StatelessWidget {
                           const SizedBox(width: 12),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 'Good morning, $firstName! 👋',
@@ -273,22 +330,25 @@ class _TopHeroSection extends StatelessWidget {
                       ),
                     ],
                   ),
-                  
-                  const SizedBox(height: 120), // Spacing to show the tree and home
-                  
-                  // --- Quote & Streak Badge ---
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                ),
+
+                const SizedBox(height: 140), // Adjust this value to shift Quote/Streak up or down
+
+                // 2. Quote (Left) & Streak Badge (Right) Row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(
                         child: Text(
-                          'Discipline today,\nfreedom tomorrow."',
+                          '"Discipline today,\nfreedom tomorrow."',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                             color: Colors.white.withOpacity(0.9),
-                            height: 1.3,
+                            height: 1.4,
                             shadows: [Shadow(color: Colors.black.withOpacity(0.6), blurRadius: 4)],
                           ),
                         ),
@@ -305,7 +365,7 @@ class _TopHeroSection extends StatelessWidget {
                             colors: [Colors.white.withOpacity(0.15), Colors.white.withOpacity(0.05)],
                           ),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10),
+                            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10),
                           ],
                         ),
                         child: Column(
@@ -333,8 +393,144 @@ class _TopHeroSection extends StatelessWidget {
                       ),
                     ],
                   ),
-                ],
+                ),
+
+                const SizedBox(height: 70),
+
+                // 3. Today's Journey & Horizontal Habit Cards (At bottom of background image)
+                if (habits.isNotEmpty)
+                  _TodayJourneySection(habits: habits),
+
+                const SizedBox(height: 24), // Bottom padding before passing to next sliver
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// ─── Exact 'Today's Journey' UI Implementation ──────────────────────────────
+class _TodayJourneySection extends StatelessWidget {
+  final List<TodayHabitModel> habits;
+
+  const _TodayJourneySection({required this.habits});
+
+  @override
+  Widget build(BuildContext context) {
+    // NOTE: Replace `index < 4` with your actual habit completion logic!
+    final int completedCount = habits.length > 1 ? habits.length - 1 : 0;
+    final double progress = habits.isEmpty ? 0 : completedCount / habits.length;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Today's Journey",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Colors.white.withOpacity(0.95),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "$completedCount/${habits.length} completed",
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Colors.white.withOpacity(0.6),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // --- Orange Progress Bar ---
+          Container(
+            height: 6,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFF2A263E), // Dark rail
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: progress.clamp(0.0, 1.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_uiOrange, Color(0xFFFFB67A)], // Glowing orange gradient
+                  ),
+                  borderRadius: BorderRadius.circular(3),
+                  boxShadow: [
+                    BoxShadow(color: _uiOrange.withOpacity(0.4), blurRadius: 4),
+                  ],
+                ),
               ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // --- Horizontal Habit Icons ---
+          SizedBox(
+            height: 105,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: habits.length,
+              itemBuilder: (context, index) {
+                final habit = habits[index];
+                // TODO: Replace with actual completion status
+                final isDone = index < completedCount;
+
+                return Container(
+                  width: 72,
+                  margin: const EdgeInsets.only(right: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF161324), // Match dark tile color
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(habit.icon, style: const TextStyle(fontSize: 24)),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          habit.name,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.8),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Dynamic checkmark or empty circle
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDone ? const Color(0xFF4CAF50) : Colors.transparent,
+                          border: Border.all(
+                            color: isDone ? Colors.transparent : Colors.white.withOpacity(0.2),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: isDone
+                            ? const Icon(Icons.check, size: 12, color: Colors.white)
+                            : null,
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -364,19 +560,19 @@ class _StarQuoteCard extends StatelessWidget {
         ],
       ),
       child: Stack(
-        clipBehavior: Clip.none, // Allows the image to safely exceed bounds if needed
+        clipBehavior: Clip.none, // <--- Key to letting the image escape the borders
         children: [
           // 3D Star Asset aligned to the right, full size, unclipped
           Positioned(
-            right: 8, // Tweak this if you want it closer/further from the edge
-            top: -15, // Negative margin lets it comfortably take up maximum vertical space 
-            bottom: -15,
+            right: 8,
+            top: -15, // Allows the star to overflow the top of the card
+            bottom: -15, // Allows the star to overflow the bottom of the card
             child: Image.asset(
               'assets/images/homestar.png', // <-- YOUR STAR IMAGE
-              fit: BoxFit.contain, // Ensures the entire image is shown without cutting
+              fit: BoxFit.contain, // Ensures the entire star image is shown
             ),
           ),
-          
+
           // Text Content
           Align(
             alignment: Alignment.centerLeft,
@@ -436,10 +632,10 @@ class _HabitCardWithSubtasks extends ConsumerWidget {
         initiallyExpanded: initiallyExpanded,
         onSubtaskToggle: (subtaskId, currentValue) {
           ref.read(homeProvider.notifier).toggleSubtask(
-                habitId: habit.id,
-                subtaskId: subtaskId,
-                currentValue: currentValue,
-              );
+            habitId: habit.id,
+            subtaskId: subtaskId,
+            currentValue: currentValue,
+          );
         },
       ),
     );

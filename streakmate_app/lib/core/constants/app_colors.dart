@@ -34,9 +34,10 @@ class AppColors {
   static const Color darkTextPrimary = Color(0xFFF4F2EC);
   static const Color darkTextSecondary = Color(0xFFA9ADBB);
 
-  static const Color flameOrange = Color(0xFFF2A33D);
-  static const Color flameOrangeDeep = Color(0xFFE8762B);
-  static const Color xpGold = Color(0xFFE8C468);
+  // ── Primary accent — warm gold (replaces old orange throughout the app) ──
+  static const Color flameOrange = Color(0xFFE5C07A);      // was 0xFFF2A33D
+  static const Color flameOrangeDeep = Color(0xFFE5C07A);  // was 0xFFE8762B
+  static const Color xpGold = Color(0xFFE5C07A);           // same warm gold
 
   // Shared status colors
   static const Color success = Color(0xFF1D9E75);

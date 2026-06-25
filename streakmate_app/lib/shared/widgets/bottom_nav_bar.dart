@@ -51,7 +51,7 @@ class AppBottomNavBar extends StatelessWidget {
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFFF2A33D), Color(0xFFE8762B)],
+                      colors: [Color(0xFFFF8A00), Color(0xFFFF8A00)],
                     ),
                     boxShadow: [
                       BoxShadow(
