@@ -13,4 +13,9 @@ class RouteNames {
   static const String onboardingReminders = '/onboarding/reminders';
 
   static const String home = '/home';
+  static const String profileEdit = '/profile/edit';
+  static const String profileAchievements = '/profile/achievements';
+  static const String profileReminders = '/profile/reminders';
+  static const String profileFreeze = '/profile/freeze';
+  static const String profileSettings = '/profile/settings';
 }

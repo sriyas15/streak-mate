@@ -127,6 +127,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 
+  /// Called after a successful profile update so the UI reflects the
+  /// new name/bio/username without needing a full /auth/me re-fetch.
+  void setUser(UserModel user) {
+    state = state.copyWith(status: AuthStatus.authenticated, user: user);
+  }
+
   void clearError() {
     state = state.copyWith(errorMessage: null);
   }
