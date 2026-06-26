@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../models/remote/friends_model.dart';
 import '../../../providers/friends_provider.dart';
+import '../../../shared/widgets/custom_avatar.dart';
 
 class FriendsScreen extends ConsumerStatefulWidget {
   const FriendsScreen({super.key});
@@ -199,17 +200,10 @@ class _Podium extends StatelessWidget {
             children: [
               Text(crowns[i], style: const TextStyle(fontSize: 22)),
               const SizedBox(height: 6),
-              CircleAvatar(
-                radius: i == 1 ? 28 : 22,
-                backgroundColor: colors[i].withOpacity(0.2),
-                child: Text(
-                  entry.initials,
-                  style: TextStyle(
-                    fontSize: i == 1 ? 18 : 14,
-                    fontWeight: FontWeight.w700,
-                    color: colors[i],
-                  ),
-                ),
+              CustomAvatar(
+                url: entry.profilePicture,
+                name: entry.name,
+                size: i == 1 ? 56 : 44, // Adjust size for the first place
               ),
               const SizedBox(height: 6),
               Text(
@@ -417,12 +411,11 @@ class _RequestTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.welfareBlue.withOpacity(0.2),
-            child: Text(s.initials,
-                style: const TextStyle(
-                    color: AppColors.welfareBlue, fontWeight: FontWeight.w700)),
+          // FIXED: Used CustomAvatar
+          CustomAvatar(
+            url: s.profilePicture,
+            name: s.name,
+            size: 40,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -478,12 +471,11 @@ class _FriendTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.flameOrange.withOpacity(0.15),
-            child: Text(friend.initials,
-                style: const TextStyle(
-                    color: AppColors.flameOrange, fontWeight: FontWeight.w700)),
+          // FIXED: Used CustomAvatar
+          CustomAvatar(
+            url: friend.profilePicture,
+            name: friend.name,
+            size: 40,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -574,12 +566,11 @@ class _SuggestionTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.success.withOpacity(0.15),
-            child: Text(friend.initials,
-                style: const TextStyle(
-                    color: AppColors.success, fontWeight: FontWeight.w700)),
+          // FIXED: Used CustomAvatar
+          CustomAvatar(
+            url: friend.profilePicture,
+            name: friend.name,
+            size: 40,
           ),
           const SizedBox(width: 10),
           Expanded(
