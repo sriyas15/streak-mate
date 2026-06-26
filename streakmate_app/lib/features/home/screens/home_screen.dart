@@ -11,6 +11,7 @@ import '../widgets/streak_banner.dart';
 import '../../journey/screens/journey_screen.dart';
 import '../../friends/screens/friends_screen.dart';
 import '../../profile/screens/profile_screen.dart';
+import '../../../shared/widgets/custom_avatar.dart'; 
 
 // The exact glowing orange color from the Home UI progress and highlights
 const Color _uiOrange = Color(0xFFE5C07A);
@@ -109,6 +110,7 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
             child: _TopHeroSection(
               firstName: firstName,
               streakDays: streak,
+              user: user,
               hasAvatar: user?.name.isNotEmpty ?? false,
               habits: homeState.status == HomeStatus.loaded ? homeState.habits : [],
             ),
@@ -236,12 +238,14 @@ class _TopHeroSection extends StatelessWidget {
   final String firstName;
   final int streakDays;
   final bool hasAvatar;
+  final dynamic user;
   final List<TodayHabitModel> habits;
 
   const _TopHeroSection({
     required this.firstName,
     required this.streakDays,
     required this.hasAvatar,
+    required this.user,
     required this.habits,
   });
 
@@ -293,11 +297,10 @@ class _TopHeroSection extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          CircleAvatar(
-                            radius: 22,
-                            backgroundImage: const AssetImage('assets/images/avatar.png'),
-                            backgroundColor: const Color(0xFF1E1A2D),
-                            child: !hasAvatar ? const Text('R', style: TextStyle(color: Colors.white)) : null,
+                          CustomAvatar(
+                            url: user?.profilePicture,
+                            name: user?.name ?? '',          
+                            size: 44,                  
                           ),
                           const SizedBox(width: 12),
                           Column(
