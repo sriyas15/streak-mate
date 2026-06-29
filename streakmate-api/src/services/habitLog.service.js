@@ -4,6 +4,7 @@ import { streakService } from './streak.service.js'
 import { dayLogService } from './dayLog.service.js'
 import { enqueueAchievementCheck } from '../config/bullmq.js'
 import { emitToUser, SOCKET_EVENTS } from '../config/socket.js'
+import { gamificationService } from './gamification.service.js'
 
 export const habitLogService = {
   // ── Create log (upsert — safe to call multiple times) ────────────
@@ -88,6 +89,8 @@ export const habitLogService = {
 
     const result = log.subtaskResults.find((r) => r.subtaskId.toString() === subtaskId)
     if (!result) throwNotFound('Subtask result')
+    
+    const wasCompleted = result.isCompleted
 
     result.isCompleted = isCompleted
     result.value = value ?? result.value
@@ -104,6 +107,10 @@ export const habitLogService = {
     if (!isComplete) log.completedAt = null
 
     await log.save()
+
+    if (isCompleted && !wasCompleted) {
+      await gamificationService.awardXP(userId, 10, `subtask_complete:${subtaskId}`)
+    }
 
     // If just completed — trigger streak update + achievement check
     if (isComplete) {
@@ -135,6 +142,15 @@ export const habitLogService = {
     log.completionPercentage = 100
     log.completedAt = new Date()
     await log.save()
+
+    // After await log.save(), before streakService call:
+    const newlyCompleted = subtasks.filter((s) => {
+      const result = log.subtaskResults.find((r) => r.subtaskId.toString() === s._id.toString())
+      return result?.isCompleted  // all required ones were just set to true
+    })
+    if (newlyCompleted.length > 0) {
+      await gamificationService.awardXP(userId, newlyCompleted.length * 10, `mark_complete:${habitId}`)
+    }
 
     await streakService.handleHabitComplete(userId, habitId, date)
     await dayLogService.recalculate(userId, date)
