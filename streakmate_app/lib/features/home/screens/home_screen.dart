@@ -12,6 +12,8 @@ import '../../journey/screens/journey_screen.dart';
 import '../../friends/screens/friends_screen.dart';
 import '../../profile/screens/profile_screen.dart';
 import '../../../shared/widgets/custom_avatar.dart'; 
+import '../../calendar/screens/calendar_screen.dart';
+import '../../habits/screens/add_habit_screen.dart';
 
 // The exact glowing orange color from the Home UI progress and highlights
 const Color _uiOrange = Color(0xFFE5C07A);
@@ -46,7 +48,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.darkBg, // Deep dark background from UI
+      backgroundColor: AppColors.darkBg,
       body: IndexedStack(
         index: _tabIndex(_currentIndex),
         children: _tabs,
@@ -54,10 +56,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       bottomNavigationBar: AppBottomNavBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
-        onAddTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Add habit — coming soon')),
+        onAddTap: () async {
+          final added = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (_) => const AddHabitScreen()),
           );
+          if (added == true && context.mounted) {
+            ref.read(homeProvider.notifier).loadToday();
+          }
         },
       ),
     );
@@ -100,25 +106,32 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
     final streak = user?.currentStreakDays ?? 28;
 
     return RefreshIndicator(
-      color: _uiOrange, // Updated to exact UI orange color
+      color: _uiOrange,
       backgroundColor: const Color(0xFF1E1A2D),
       onRefresh: () => ref.read(homeProvider.notifier).refresh(),
       child: CustomScrollView(
         slivers: [
-          // ── Unified Top Hero Section (App Bar + Tree + Quote/Streak + Journey) ────
+          // ── Unified Top Hero Section ─────────────────────────
           SliverToBoxAdapter(
             child: _TopHeroSection(
               firstName: firstName,
               streakDays: streak,
               user: user,
               hasAvatar: user?.name.isNotEmpty ?? false,
-              habits: homeState.status == HomeStatus.loaded ? homeState.habits : [],
+              habits: homeState.status == HomeStatus.loaded
+                  ? homeState.habits
+                  : [],
+              onStreakTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const CalendarScreen()),
+              ),
             ),
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-          // ── Star Quote Card ──────────────────────────────────────────
+          // ── Star Quote Card ──────────────────────────────────
           const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
@@ -128,7 +141,7 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
 
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
 
-          // ── Section header for vertical list ─────────────────────────
+          // ── Section header ───────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -145,19 +158,23 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
                   ),
                   if (homeState.allDone)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppColors.success.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.success.withOpacity(0.4)),
+                        border: Border.all(
+                            color: AppColors.success.withOpacity(0.4)),
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.check_circle, size: 13, color: AppColors.success),
+                          Icon(Icons.check_circle,
+                              size: 13, color: AppColors.success),
                           SizedBox(width: 4),
                           Text(
                             'All done!',
-                            style: TextStyle(fontSize: 12, color: AppColors.success),
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.success),
                           ),
                         ],
                       ),
@@ -168,10 +185,14 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-          // ── Vertical Habit List ──────────────────────────────────────
+          // ── Vertical Habit List ──────────────────────────────
           if (homeState.status == HomeStatus.loading)
             const SliverToBoxAdapter(
-              child: Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator(color: _uiOrange))),
+              child: Center(
+                  child: Padding(
+                padding: EdgeInsets.all(40),
+                child: CircularProgressIndicator(color: _uiOrange),
+              )),
             )
           else if (homeState.status == HomeStatus.error)
             SliverToBoxAdapter(
@@ -180,52 +201,59 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
                   padding: const EdgeInsets.all(32),
                   child: Column(
                     children: [
-                      const Text('😕', style: TextStyle(fontSize: 40)),
+                      const Text('😕',
+                          style: TextStyle(fontSize: 40)),
                       const SizedBox(height: 12),
                       Text(
                         homeState.errorMessage ?? 'Something went wrong',
-                        style: const TextStyle(color: AppColors.darkTextSecondary),
+                        style: const TextStyle(
+                            color: AppColors.darkTextSecondary),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),
                       TextButton(
-                        onPressed: () => ref.read(homeProvider.notifier).loadToday(),
-                        child: const Text('Retry', style: TextStyle(color: _uiOrange)),
+                        onPressed: () =>
+                            ref.read(homeProvider.notifier).loadToday(),
+                        child: const Text('Retry',
+                            style: TextStyle(color: _uiOrange)),
                       ),
                     ],
                   ),
                 ),
               ),
             )
-          else if (homeState.habits.isEmpty && homeState.status == HomeStatus.loaded)
-              const SliverToBoxAdapter(
-                child: Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(40),
-                    child: Text(
-                      'No habits scheduled for today 🎉',
-                      style: TextStyle(color: AppColors.darkTextSecondary),
-                    ),
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                      final habit = homeState.habits[index];
-                      return _HabitCardWithSubtasks(
-                        habit: habit,
-                        isLoading: homeState.loadingHabitIds.contains(habit.id),
-                        initiallyExpanded: index == 0,
-                      );
-                    },
-                    childCount: homeState.habits.length,
+          else if (homeState.habits.isEmpty &&
+              homeState.status == HomeStatus.loaded)
+            const SliverToBoxAdapter(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.all(40),
+                  child: Text(
+                    'No habits scheduled for today 🎉',
+                    style:
+                        TextStyle(color: AppColors.darkTextSecondary),
                   ),
                 ),
               ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final habit = homeState.habits[index];
+                    return _HabitCardWithSubtasks(
+                      habit: habit,
+                      isLoading:
+                          homeState.loadingHabitIds.contains(habit.id),
+                      initiallyExpanded: index == 0,
+                    );
+                  },
+                  childCount: homeState.habits.length,
+                ),
+              ),
+            ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),
@@ -233,13 +261,14 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
   }
 }
 
-/// ─── New Unified Top Hero Section ────────────────────────────────────────────
+/// ─── Unified Top Hero Section ─────────────────────────────────────────────
 class _TopHeroSection extends StatelessWidget {
   final String firstName;
   final int streakDays;
   final bool hasAvatar;
   final dynamic user;
   final List<TodayHabitModel> habits;
+  final VoidCallback onStreakTap; // ← calendar entry point
 
   const _TopHeroSection({
     required this.firstName,
@@ -247,23 +276,23 @@ class _TopHeroSection extends StatelessWidget {
     required this.hasAvatar,
     required this.user,
     required this.habits,
+    required this.onStreakTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Container wraps its content size, stretching background natively
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
         image: DecorationImage(
-          image: AssetImage('assets/images/homeScreen.png'), // <-- YOUR TREE+HOME IMAGE
-          fit: BoxFit.cover, // Ensures image expands to fit all dynamic inner content
+          image: AssetImage('assets/images/homeScreen.png'),
+          fit: BoxFit.cover,
           alignment: Alignment.topCenter,
         ),
       ),
       child: Stack(
         children: [
-          // Gradient overlay to seamlessly fade the image into the dark background at the bottom
+          // Gradient overlay
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -281,14 +310,13 @@ class _TopHeroSection extends StatelessWidget {
             ),
           ),
 
-          // --- Content Structure ---
           SafeArea(
             bottom: false,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. App Bar (Top)
+                // 1. App Bar
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                   child: Row(
@@ -299,8 +327,8 @@ class _TopHeroSection extends StatelessWidget {
                         children: [
                           CustomAvatar(
                             url: user?.profilePicture,
-                            name: user?.name ?? '',          
-                            size: 44,                  
+                            name: user?.name ?? '',
+                            size: 44,
                           ),
                           const SizedBox(width: 12),
                           Column(
@@ -328,16 +356,19 @@ class _TopHeroSection extends StatelessWidget {
                         ],
                       ),
                       IconButton(
-                        icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 28),
+                        icon: const Icon(
+                            Icons.notifications_none_rounded,
+                            color: Colors.white,
+                            size: 28),
                         onPressed: () {},
                       ),
                     ],
                   ),
                 ),
 
-                const SizedBox(height: 140), // Adjust this value to shift Quote/Streak up or down
+                const SizedBox(height: 140),
 
-                // 2. Quote (Left) & Streak Badge (Right) Row
+                // 2. Quote (left) & Streak circle (right — tappable → Calendar)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
@@ -352,46 +383,64 @@ class _TopHeroSection extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                             color: Colors.white.withOpacity(0.9),
                             height: 1.4,
-                            shadows: [Shadow(color: Colors.black.withOpacity(0.6), blurRadius: 4)],
+                            shadows: [
+                              Shadow(
+                                  color:
+                                      Colors.black.withOpacity(0.6),
+                                  blurRadius: 4)
+                            ],
                           ),
                         ),
                       ),
-                      Container(
-                        width: 76,
-                        height: 76,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white.withOpacity(0.2), width: 2),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Colors.white.withOpacity(0.15), Colors.white.withOpacity(0.05)],
+                      // ── Streak circle — tap opens Calendar ──
+                      GestureDetector(
+                        onTap: onStreakTap,
+                        child: Container(
+                          width: 76,
+                          height: 76,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: Colors.white.withOpacity(0.2),
+                                width: 2),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.white.withOpacity(0.15),
+                                Colors.white.withOpacity(0.05)
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                  color:
+                                      Colors.black.withOpacity(0.3),
+                                  blurRadius: 10),
+                            ],
                           ),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              '$streakDays',
-                              style: const TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                height: 1.1,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '$streakDays',
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  height: 1.1,
+                                ),
                               ),
-                            ),
-                            Text(
-                              'Day Streak',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white.withOpacity(0.8),
+                              Text(
+                                'Day Streak',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  color:
+                                      Colors.white.withOpacity(0.8),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -400,11 +449,11 @@ class _TopHeroSection extends StatelessWidget {
 
                 const SizedBox(height: 70),
 
-                // 3. Today's Journey & Horizontal Habit Cards (At bottom of background image)
+                // 3. Today's Journey section
                 if (habits.isNotEmpty)
                   _TodayJourneySection(habits: habits),
 
-                const SizedBox(height: 24), // Bottom padding before passing to next sliver
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -414,7 +463,7 @@ class _TopHeroSection extends StatelessWidget {
   }
 }
 
-/// ─── Exact 'Today's Journey' UI Implementation ──────────────────────────────
+/// ─── Today's Journey ──────────────────────────────────────────────────────
 class _TodayJourneySection extends StatelessWidget {
   final List<TodayHabitModel> habits;
 
@@ -422,9 +471,10 @@ class _TodayJourneySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // NOTE: Replace `index < 4` with your actual habit completion logic!
-    final int completedCount = habits.length > 1 ? habits.length - 1 : 0;
-    final double progress = habits.isEmpty ? 0 : completedCount / habits.length;
+    final int completedCount =
+        habits.length > 1 ? habits.length - 1 : 0;
+    final double progress =
+        habits.isEmpty ? 0 : completedCount / habits.length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -450,12 +500,12 @@ class _TodayJourneySection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // --- Orange Progress Bar ---
+          // Progress bar
           Container(
             height: 6,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: const Color(0xFF2A263E), // Dark rail
+              color: const Color(0xFF2A263E),
               borderRadius: BorderRadius.circular(3),
             ),
             child: FractionallySizedBox(
@@ -464,11 +514,13 @@ class _TodayJourneySection extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [_uiOrange, Color(0xFFFFB67A)], // Glowing orange gradient
+                    colors: [_uiOrange, Color(0xFFFFB67A)],
                   ),
                   borderRadius: BorderRadius.circular(3),
                   boxShadow: [
-                    BoxShadow(color: _uiOrange.withOpacity(0.4), blurRadius: 4),
+                    BoxShadow(
+                        color: _uiOrange.withOpacity(0.4),
+                        blurRadius: 4),
                   ],
                 ),
               ),
@@ -476,7 +528,7 @@ class _TodayJourneySection extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // --- Horizontal Habit Icons ---
+          // Horizontal habit cards
           SizedBox(
             height: 105,
             child: ListView.builder(
@@ -484,24 +536,26 @@ class _TodayJourneySection extends StatelessWidget {
               itemCount: habits.length,
               itemBuilder: (context, index) {
                 final habit = habits[index];
-                // TODO: Replace with actual completion status
                 final isDone = index < completedCount;
 
                 return Container(
                   width: 72,
                   margin: const EdgeInsets.only(right: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF161324), // Match dark tile color
+                    color: const Color(0xFF161324),
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                    border: Border.all(
+                        color: Colors.white.withOpacity(0.05)),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(habit.icon, style: const TextStyle(fontSize: 24)),
+                      Text(habit.icon,
+                          style: const TextStyle(fontSize: 24)),
                       const SizedBox(height: 8),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 4),
                         child: Text(
                           habit.name,
                           style: TextStyle(
@@ -514,20 +568,24 @@ class _TodayJourneySection extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // Dynamic checkmark or empty circle
                       Container(
                         width: 18,
                         height: 18,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: isDone ? const Color(0xFF4CAF50) : Colors.transparent,
+                          color: isDone
+                              ? const Color(0xFF4CAF50)
+                              : Colors.transparent,
                           border: Border.all(
-                            color: isDone ? Colors.transparent : Colors.white.withOpacity(0.2),
+                            color: isDone
+                                ? Colors.transparent
+                                : Colors.white.withOpacity(0.2),
                             width: 1.5,
                           ),
                         ),
                         child: isDone
-                            ? const Icon(Icons.check, size: 12, color: Colors.white)
+                            ? const Icon(Icons.check,
+                                size: 12, color: Colors.white)
                             : null,
                       ),
                     ],
@@ -542,7 +600,7 @@ class _TodayJourneySection extends StatelessWidget {
   }
 }
 
-/// ─── New Star Quote Card ─────────────────────────────────────────────────────
+/// ─── Star Quote Card ──────────────────────────────────────────────────────
 class _StarQuoteCard extends StatelessWidget {
   const _StarQuoteCard();
 
@@ -551,7 +609,7 @@ class _StarQuoteCard extends StatelessWidget {
     return Container(
       height: 90,
       decoration: BoxDecoration(
-        color: const Color(0xFF161324), // Dark sleek card background
+        color: const Color(0xFF161324),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withOpacity(0.05)),
         boxShadow: [
@@ -563,20 +621,17 @@ class _StarQuoteCard extends StatelessWidget {
         ],
       ),
       child: Stack(
-        clipBehavior: Clip.none, // <--- Key to letting the image escape the borders
+        clipBehavior: Clip.none,
         children: [
-          // 3D Star Asset aligned to the right, full size, unclipped
           Positioned(
             right: 8,
-            top: -15, // Allows the star to overflow the top of the card
-            bottom: -15, // Allows the star to overflow the bottom of the card
+            top: -15,
+            bottom: -15,
             child: Image.asset(
-              'assets/images/homestar.png', // <-- YOUR STAR IMAGE
-              fit: BoxFit.contain, // Ensures the entire star image is shown
+              'assets/images/homestar.png',
+              fit: BoxFit.contain,
             ),
           ),
-
-          // Text Content
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(
@@ -598,7 +653,7 @@ class _StarQuoteCard extends StatelessWidget {
   }
 }
 
-/// ─── Subtask Handling (Unchanged) ────────────────────────────────────────────
+/// ─── Habit Card With Subtasks ─────────────────────────────────────────────
 class _HabitCardWithSubtasks extends ConsumerWidget {
   const _HabitCardWithSubtasks({
     required this.habit,
@@ -635,10 +690,10 @@ class _HabitCardWithSubtasks extends ConsumerWidget {
         initiallyExpanded: initiallyExpanded,
         onSubtaskToggle: (subtaskId, currentValue) {
           ref.read(homeProvider.notifier).toggleSubtask(
-            habitId: habit.id,
-            subtaskId: subtaskId,
-            currentValue: currentValue,
-          );
+                habitId: habit.id,
+                subtaskId: subtaskId,
+                currentValue: currentValue,
+              );
         },
       ),
     );
