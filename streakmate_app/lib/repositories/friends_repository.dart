@@ -16,7 +16,8 @@ class FriendsRepository {
   }
 
   Future<List<FriendModel>> searchUsers(String query) async {
-    final r = await _dio.get('/friends/search', queryParameters: {'q': query});
+    final r = await _dio.get('/friends/search',
+        queryParameters: {'q': query});
     _check(r);
     return (r.data['data']['users'] as List)
         .map((e) => FriendModel.fromJson(e as Map<String, dynamic>))
@@ -31,35 +32,53 @@ class FriendsRepository {
         .toList();
   }
 
+  Future<List<FriendActivityItem>> getActivity() async {
+    final r = await _dio.get('/friends/activity');
+    _check(r);
+    return (r.data['data']['activity'] as List)
+        .map((e) =>
+            FriendActivityItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<FriendRequestModel>> getIncomingRequests() async {
     final r = await _dio.get('/friends/requests');
     _check(r);
     return (r.data['data']['requests'] as List)
-        .map((e) => FriendRequestModel.fromJson(e as Map<String, dynamic>))
+        .map((e) =>
+            FriendRequestModel.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
   Future<void> sendRequest(String userId) async {
     final r = await _dio.post('/friends/request/$userId',
-        data: {}, options: Options(headers: {'Content-Type': 'application/json'}));
+        data: {},
+        options: Options(
+            headers: {'Content-Type': 'application/json'}));
     _check(r);
   }
 
   Future<void> acceptRequest(String userId) async {
     final r = await _dio.post('/friends/accept/$userId',
-        data: {}, options: Options(headers: {'Content-Type': 'application/json'}));
+        data: {},
+        options: Options(
+            headers: {'Content-Type': 'application/json'}));
     _check(r);
   }
 
   Future<void> rejectRequest(String userId) async {
     final r = await _dio.post('/friends/reject/$userId',
-        data: {}, options: Options(headers: {'Content-Type': 'application/json'}));
+        data: {},
+        options: Options(
+            headers: {'Content-Type': 'application/json'}));
     _check(r);
   }
 
   Future<void> nudgeFriend(String userId) async {
     final r = await _dio.post('/friends/$userId/nudge',
-        data: {}, options: Options(headers: {'Content-Type': 'application/json'}));
+        data: {},
+        options: Options(
+            headers: {'Content-Type': 'application/json'}));
     _check(r);
   }
 

@@ -1,4 +1,5 @@
 /// friends_model.dart
+
 class FriendModel {
   final String id;
   final String name;
@@ -7,6 +8,9 @@ class FriendModel {
   final int currentStreakDays;
   final int bestStreakDays;
   final int level;
+  // Extra fields returned by search
+  final bool isFriend;
+  final bool requestSent;
 
   const FriendModel({
     required this.id,
@@ -16,6 +20,8 @@ class FriendModel {
     required this.currentStreakDays,
     required this.bestStreakDays,
     required this.level,
+    this.isFriend = false,
+    this.requestSent = false,
   });
 
   factory FriendModel.fromJson(Map<String, dynamic> json) => FriendModel(
@@ -26,6 +32,8 @@ class FriendModel {
         currentStreakDays: json['currentStreakDays'] as int? ?? 0,
         bestStreakDays: json['bestStreakDays'] as int? ?? 0,
         level: json['level'] as int? ?? 1,
+        isFriend: json['isFriend'] as bool? ?? false,
+        requestSent: json['requestSent'] as bool? ?? false,
       );
 
   String get initials {
@@ -100,5 +108,62 @@ class LeaderboardEntry {
     final parts = name.trim().split(' ');
     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
+}
+
+/// Activity feed item from GET /friends/activity
+class FriendActivityItem {
+  final String id;
+  final String friendName;
+  final String friendUsername;
+  final String? friendPicture;
+  final String habitName;
+  final String habitIcon;
+  final DateTime completedAt;
+
+  const FriendActivityItem({
+    required this.id,
+    required this.friendName,
+    required this.friendUsername,
+    this.friendPicture,
+    required this.habitName,
+    required this.habitIcon,
+    required this.completedAt,
+  });
+
+  factory FriendActivityItem.fromJson(Map<String, dynamic> json) {
+    // userId and habitId are populated objects from .populate()
+    final user = json['userId'];
+    final habit = json['habitId'];
+    final name = user is Map ? (user['name'] as String? ?? '') : '';
+    final username = user is Map ? (user['username'] as String? ?? '') : '';
+    final picture = user is Map ? user['profilePicture'] as String? : null;
+    final hName = habit is Map ? (habit['name'] as String? ?? '') : '';
+    final hIcon = habit is Map ? (habit['icon'] as String? ?? '⭐') : '⭐';
+
+    return FriendActivityItem(
+      id: json['_id'] as String? ?? '',
+      friendName: name,
+      friendUsername: username,
+      friendPicture: picture,
+      habitName: hName,
+      habitIcon: hIcon,
+      completedAt: json['completedAt'] != null
+          ? DateTime.tryParse(json['completedAt'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+
+  String get timeAgo {
+    final diff = DateTime.now().difference(completedAt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  String get initials {
+    final parts = friendName.trim().split(' ');
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    return friendName.isNotEmpty ? friendName[0].toUpperCase() : '?';
   }
 }

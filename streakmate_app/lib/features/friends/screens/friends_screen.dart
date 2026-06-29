@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../models/remote/friends_model.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../providers/friends_provider.dart';
-import '../../../shared/widgets/custom_avatar.dart';
 
 class FriendsScreen extends ConsumerStatefulWidget {
   const FriendsScreen({super.key});
@@ -19,7 +19,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 3, vsync: this);
+    _tab = TabController(length: 2, vsync: this);
     Future.microtask(() => ref.read(friendsProvider.notifier).loadAll());
   }
 
@@ -32,158 +32,407 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(friendsProvider);
+    final myUserId = ref.watch(authProvider).user?.id ?? '';
 
     ref.listen<FriendsState>(friendsProvider, (_, next) {
       if (next.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.error!), backgroundColor: AppColors.danger),
+          SnackBar(
+              content: Text(next.error!),
+              backgroundColor: AppColors.danger),
         );
-        ref.read(friendsProvider.notifier).clearError();
+        ref.read(friendsProvider.notifier).clearMessages();
+      }
+      if (next.successMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(next.successMessage!),
+              backgroundColor: AppColors.success),
+        );
+        ref.read(friendsProvider.notifier).clearMessages();
       }
     });
 
     return Scaffold(
       backgroundColor: AppColors.darkBg,
       body: SafeArea(
-        child: Column(
-          children: [
-            // ── Header ────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Row(
-                children: [
-                  const Text('Friends',
-                      style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.darkTextPrimary)),
-                  const Spacer(),
+        child: state.loading
+            ? const Center(
+                child: CircularProgressIndicator(
+                    color: AppColors.flameOrange))
+            : NestedScrollView(
+                headerSliverBuilder: (context, _) => [
+                  SliverToBoxAdapter(
+                    child: _Header(
+                      requestCount: state.incomingRequests.length,
+                    ),
+                  ),
+                  // ── Friends horizontal scroll row ──────────────
+                  if (state.friends.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _FriendsRow(
+                        friends: state.friends,
+                        myUserId: myUserId,
+                        onNudge: (id) =>
+                            ref.read(friendsProvider.notifier).nudge(id),
+                      ),
+                    ),
+                  // ── Incoming requests banner ───────────────────
                   if (state.incomingRequests.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.flameOrange,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${state.incomingRequests.length} new',
-                        style: const TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                    SliverToBoxAdapter(
+                      child: _RequestsBanner(
+                        requests: state.incomingRequests,
+                        onAccept: (id) => ref
+                            .read(friendsProvider.notifier)
+                            .acceptRequest(id),
+                        onReject: (id) => ref
+                            .read(friendsProvider.notifier)
+                            .rejectRequest(id),
                       ),
                     ),
+                  // ── Tab bar ────────────────────────────────────
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _TabBarDelegate(
+                      TabBar(
+                        controller: _tab,
+                        indicator: const UnderlineTabIndicator(
+                          borderSide: BorderSide(
+                              color: AppColors.flameOrange, width: 2.5),
+                        ),
+                        labelColor: AppColors.flameOrange,
+                        unselectedLabelColor: AppColors.darkTextSecondary,
+                        labelStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600),
+                        tabs: const [
+                          Tab(text: 'Leaderboard'),
+                          Tab(text: 'Discover'),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            // ── Tabs ──────────────────────────────────────────────
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: BoxDecoration(
-                color: AppColors.darkSurface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.darkBorder),
-              ),
-              child: TabBar(
-                controller: _tab,
-                indicator: BoxDecoration(
-                  color: AppColors.flameOrange.withOpacity(0.18),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.flameOrange.withOpacity(0.5)),
+                body: TabBarView(
+                  controller: _tab,
+                  children: [
+                    // ── Leaderboard tab ──────────────────────────
+                    _LeaderboardTab(
+                      leaderboard: state.leaderboard,
+                      activity: state.activity,
+                      myUserId: myUserId,
+                    ),
+                    // ── Discover tab ─────────────────────────────
+                    _DiscoverTab(
+                      suggestions: state.suggestions,
+                      searchResults: state.searchResults,
+                      searchLoading: state.searchLoading,
+                      onSearch: (q) =>
+                          ref.read(friendsProvider.notifier).search(q),
+                      onClearSearch: () =>
+                          ref.read(friendsProvider.notifier).clearSearch(),
+                      onAdd: (id) =>
+                          ref.read(friendsProvider.notifier).sendRequest(id),
+                    ),
+                  ],
                 ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                labelColor: AppColors.flameOrange,
-                unselectedLabelColor: AppColors.darkTextSecondary,
-                labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                dividerColor: Colors.transparent,
-                tabs: const [
-                  Tab(text: 'Leaderboard'),
-                  Tab(text: 'Friends'),
-                  Tab(text: 'Discover'),
-                ],
               ),
+      ),
+      // ── Invite friends FAB ─────────────────────────────────────
+      bottomNavigationBar: _InviteBar(),
+    );
+  }
+}
+
+// ── Header ───────────────────────────────────────────────────────────────────
+class _Header extends StatelessWidget {
+  const _Header({required this.requestCount});
+  final int requestCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      child: Row(
+        children: [
+          const Text('Friends',
+              style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.darkTextPrimary)),
+          const Spacer(),
+          if (requestCount > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.flameOrange,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text('$requestCount new',
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white)),
             ),
-            const SizedBox(height: 12),
-            // ── Tab views ─────────────────────────────────────────
-            Expanded(
-              child: state.loading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: AppColors.flameOrange))
-                  : TabBarView(
-                      controller: _tab,
-                      children: [
-                        _LeaderboardTab(entries: state.leaderboard),
-                        _FriendsTab(
-                          friends: state.friends,
-                          requests: state.incomingRequests,
-                          onAccept: (id) => ref.read(friendsProvider.notifier).acceptRequest(id),
-                          onReject: (id) => ref.read(friendsProvider.notifier).rejectRequest(id),
-                          onNudge: (id) async {
-                            await ref.read(friendsProvider.notifier).nudge(id);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Nudge sent 👊')),
-                              );
-                            }
-                          },
-                        ),
-                        _DiscoverTab(
-                          suggestions: state.suggestions,
-                          onAdd: (id) => ref.read(friendsProvider.notifier).sendRequest(id),
-                        ),
-                      ],
-                    ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
 }
 
-// ── Leaderboard tab ──────────────────────────────────────────────────────────
-class _LeaderboardTab extends StatelessWidget {
-  const _LeaderboardTab({required this.entries});
-  final List<LeaderboardEntry> entries;
+// ── Friends horizontal scroll row (matching image 2) ────────────────────────
+class _FriendsRow extends StatelessWidget {
+  const _FriendsRow({
+    required this.friends,
+    required this.myUserId,
+    required this.onNudge,
+  });
+  final List<FriendModel> friends;
+  final String myUserId;
+  final ValueChanged<String> onNudge;
 
   @override
   Widget build(BuildContext context) {
-    if (entries.isEmpty) {
-      return const _EmptyState(
-        emoji: '🏆',
-        message: 'Add friends to see the leaderboard!',
-      );
-    }
-
-    final top3 = entries.take(3).toList();
-    final rest = entries.skip(3).toList();
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Podium
-        if (top3.length >= 1) _Podium(top3: top3),
-        const SizedBox(height: 20),
-        // Remaining entries
-        ...rest.map((e) => _LeaderboardRow(entry: e)),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+          child: Text('Friends',
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.darkTextSecondary)),
+        ),
+        SizedBox(
+          height: 100,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: friends.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 16),
+            itemBuilder: (_, i) => _FriendAvatar(
+              friend: friends[i],
+              onNudge: () => onNudge(friends[i].id),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
       ],
     );
   }
 }
 
+class _FriendAvatar extends StatelessWidget {
+  const _FriendAvatar({required this.friend, required this.onNudge});
+  final FriendModel friend;
+  final VoidCallback onNudge;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onLongPress: onNudge,
+      child: Column(
+        children: [
+          Stack(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.flameOrange.withOpacity(0.7),
+                      AppColors.xpGold.withOpacity(0.7),
+                    ],
+                  ),
+                  border: Border.all(
+                      color: AppColors.flameOrange.withOpacity(0.4),
+                      width: 2),
+                ),
+                child: friend.profilePicture != null
+                    ? ClipOval(
+                        child: Image.network(friend.profilePicture!,
+                            fit: BoxFit.cover))
+                    : Center(
+                        child: Text(friend.initials,
+                            style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white))),
+              ),
+              // Streak badge
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 4, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.darkBg,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: AppColors.flameOrange.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('🔥',
+                          style: TextStyle(fontSize: 9)),
+                      Text('${friend.currentStreakDays}',
+                          style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.flameOrange)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            friend.name.split(' ').first,
+            style: const TextStyle(
+                fontSize: 11, color: AppColors.darkTextPrimary),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Incoming requests banner ─────────────────────────────────────────────────
+class _RequestsBanner extends StatelessWidget {
+  const _RequestsBanner({
+    required this.requests,
+    required this.onAccept,
+    required this.onReject,
+  });
+  final List<FriendRequestModel> requests;
+  final ValueChanged<String> onAccept;
+  final ValueChanged<String> onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.welfareBlue.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+            color: AppColors.welfareBlue.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${requests.length} Friend Request${requests.length > 1 ? 's' : ''}',
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.darkTextPrimary)),
+          const SizedBox(height: 10),
+          ...requests.take(3).map((r) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    _MiniAvatar(
+                        name: r.sender.name,
+                        color: AppColors.welfareBlue),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(r.sender.name,
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.darkTextPrimary)),
+                          Text(
+                              '@${r.sender.username} · 🔥 ${r.sender.currentStreakDays}',
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.darkTextSecondary)),
+                        ],
+                      ),
+                    ),
+                    _SmallBtn(
+                        label: '✓',
+                        color: AppColors.success,
+                        onTap: () => onAccept(r.sender.id)),
+                    const SizedBox(width: 6),
+                    _SmallBtn(
+                        label: '✕',
+                        color: AppColors.danger,
+                        onTap: () => onReject(r.sender.id)),
+                  ],
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Leaderboard tab ───────────────────────────────────────────────────────────
+class _LeaderboardTab extends StatelessWidget {
+  const _LeaderboardTab({
+    required this.leaderboard,
+    required this.activity,
+    required this.myUserId,
+  });
+  final List<LeaderboardEntry> leaderboard;
+  final List<FriendActivityItem> activity;
+  final String myUserId;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      children: [
+        // ── Podium (top 3) ──────────────────────────────────────
+        if (leaderboard.isNotEmpty) ...[
+          _Podium(top3: leaderboard.take(3).toList()),
+          const SizedBox(height: 16),
+        ],
+        // ── Rest of leaderboard ──────────────────────────────────
+        if (leaderboard.length > 3) ...[
+          const _SectionLabel(label: 'RANKINGS'),
+          ...leaderboard.skip(3).map((e) => _LeaderRow(entry: e)),
+          const SizedBox(height: 20),
+        ],
+        // ── Friend activity feed ─────────────────────────────────
+        if (activity.isNotEmpty) ...[
+          const _SectionLabel(label: 'FRIEND ACTIVITY'),
+          ...activity.map((a) => _ActivityTile(item: a)),
+        ] else ...[
+          const _SectionLabel(label: 'FRIEND ACTIVITY'),
+          const _EmptyActivity(),
+        ],
+      ],
+    );
+  }
+}
+
+// ── Podium ───────────────────────────────────────────────────────────────────
 class _Podium extends StatelessWidget {
   const _Podium({required this.top3});
   final List<LeaderboardEntry> top3;
 
   @override
   Widget build(BuildContext context) {
-    // Arrange: 2nd | 1st | 3rd
-    final ordered = [
-      if (top3.length > 1) top3[1],
+    // Order: 2nd | 1st | 3rd
+    final slots = [
+      if (top3.length > 1) top3[1] else null,
       top3[0],
-      if (top3.length > 2) top3[2],
+      if (top3.length > 2) top3[2] else null,
     ];
-    final heights = [90.0, 110.0, 70.0];
-    final crowns = ['🥈', '🥇', '🥉'];
+    final heights = [80.0, 110.0, 60.0];
+    final badges = ['🥈', '🥇', '🥉'];
     final colors = [
       Colors.grey.shade400,
       AppColors.xpGold,
@@ -192,18 +441,40 @@ class _Podium extends StatelessWidget {
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(ordered.length, (i) {
-        final entry = ordered[i];
+      children: List.generate(3, (i) {
+        final entry = slots[i];
+        if (entry == null) return const Expanded(child: SizedBox());
         return Expanded(
           child: Column(
             children: [
-              Text(crowns[i], style: const TextStyle(fontSize: 22)),
-              const SizedBox(height: 6),
-              CustomAvatar(
-                url: entry.profilePicture,
-                name: entry.name,
-                size: i == 1 ? 56 : 44, // Adjust size for the first place
+              Text(badges[i], style: const TextStyle(fontSize: 20)),
+              const SizedBox(height: 4),
+              // Avatar
+              Container(
+                width: i == 1 ? 56 : 44,
+                height: i == 1 ? 56 : 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: colors[i].withOpacity(0.2),
+                  border: Border.all(color: colors[i], width: 2),
+                  boxShadow: i == 1
+                      ? [
+                          BoxShadow(
+                              color: colors[i].withOpacity(0.4),
+                              blurRadius: 12)
+                        ]
+                      : null,
+                ),
+                child: entry.profilePicture != null
+                    ? ClipOval(
+                        child: Image.network(entry.profilePicture!,
+                            fit: BoxFit.cover))
+                    : Center(
+                        child: Text(entry.initials,
+                            style: TextStyle(
+                                fontSize: i == 1 ? 18 : 14,
+                                fontWeight: FontWeight.w800,
+                                color: colors[i]))),
               ),
               const SizedBox(height: 6),
               Text(
@@ -213,18 +484,52 @@ class _Podium extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: AppColors.darkTextPrimary),
                 overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
               ),
-              Text(
-                '🔥 ${entry.currentStreak}',
-                style: TextStyle(fontSize: 11, color: colors[i]),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('🔥', style: TextStyle(fontSize: 11)),
+                  Text(' ${entry.currentStreak}',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: colors[i])),
+                ],
               ),
-              const SizedBox(height: 4),
+              if (entry.isMe) ...[
+                const SizedBox(height: 3),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppColors.flameOrange.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('You',
+                      style: TextStyle(
+                          fontSize: 9,
+                          color: AppColors.flameOrange,
+                          fontWeight: FontWeight.w600)),
+                ),
+              ],
+              const SizedBox(height: 6),
+              // Podium block
               Container(
                 height: heights[i],
                 decoration: BoxDecoration(
                   color: colors[i].withOpacity(0.15),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-                  border: Border.all(color: colors[i].withOpacity(0.4)),
+                  borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(8)),
+                  border: Border.all(
+                      color: colors[i].withOpacity(0.3)),
+                ),
+                child: Center(
+                  child: Text('#${entry.rank}',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: colors[i])),
                 ),
               ),
             ],
@@ -235,23 +540,23 @@ class _Podium extends StatelessWidget {
   }
 }
 
-class _LeaderboardRow extends StatelessWidget {
-  const _LeaderboardRow({required this.entry});
+class _LeaderRow extends StatelessWidget {
+  const _LeaderRow({required this.entry});
   final LeaderboardEntry entry;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
         color: entry.isMe
-            ? AppColors.flameOrange.withOpacity(0.1)
+            ? AppColors.flameOrange.withOpacity(0.08)
             : AppColors.darkSurface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: entry.isMe
-              ? AppColors.flameOrange.withOpacity(0.4)
+              ? AppColors.flameOrange.withOpacity(0.35)
               : AppColors.darkBorder,
         ),
       ),
@@ -259,26 +564,16 @@ class _LeaderboardRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 28,
-            child: Text(
-              '#${entry.rank}',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: entry.isMe
-                    ? AppColors.flameOrange
-                    : AppColors.darkTextSecondary,
-              ),
-            ),
-          ),
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.darkSurfaceElevated,
-            child: Text(entry.initials,
-                style: const TextStyle(
-                    fontSize: 12,
+            child: Text('#${entry.rank}',
+                style: TextStyle(
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.flameOrange)),
+                    color: entry.isMe
+                        ? AppColors.flameOrange
+                        : AppColors.darkTextSecondary)),
           ),
+          _MiniAvatar(name: entry.name, color: AppColors.flameOrange,
+              picture: entry.profilePicture),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -286,166 +581,47 @@ class _LeaderboardRow extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      entry.name,
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.darkTextPrimary),
+                    Expanded(
+                      child: Text(entry.name,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.darkTextPrimary),
+                          overflow: TextOverflow.ellipsis),
                     ),
-                    if (entry.isMe) ...[
-                      const SizedBox(width: 6),
+                    if (entry.isMe)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
                         decoration: BoxDecoration(
-                          color: AppColors.flameOrange.withOpacity(0.2),
+                          color:
+                              AppColors.flameOrange.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text('You',
                             style: TextStyle(
-                                fontSize: 10, color: AppColors.flameOrange)),
+                                fontSize: 9,
+                                color: AppColors.flameOrange)),
                       ),
-                    ]
                   ],
                 ),
-                Text('@${entry.username}',
+                Text('@${entry.username} · Lv ${entry.level}',
                     style: const TextStyle(
-                        fontSize: 11, color: AppColors.darkTextSecondary)),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Row(
-                children: [
-                  const Text('🔥', style: TextStyle(fontSize: 13)),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${entry.currentStreak} days',
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.flameOrange),
-                  ),
-                ],
-              ),
-              Text('Lv ${entry.level}',
-                  style: const TextStyle(
-                      fontSize: 11, color: AppColors.darkTextSecondary)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Friends tab ───────────────────────────────────────────────────────────────
-class _FriendsTab extends StatelessWidget {
-  const _FriendsTab({
-    required this.friends,
-    required this.requests,
-    required this.onAccept,
-    required this.onReject,
-    required this.onNudge,
-  });
-
-  final List<FriendModel> friends;
-  final List<FriendRequestModel> requests;
-  final ValueChanged<String> onAccept;
-  final ValueChanged<String> onReject;
-  final ValueChanged<String> onNudge;
-
-  @override
-  Widget build(BuildContext context) {
-    if (friends.isEmpty && requests.isEmpty) {
-      return const _EmptyState(
-        emoji: '👥',
-        message: 'No friends yet.\nHead to Discover to find people!',
-      );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-      children: [
-        if (requests.isNotEmpty) ...[
-          _SectionHeader(
-              title: 'Friend Requests', badge: requests.length.toString()),
-          ...requests.map((r) => _RequestTile(
-                request: r,
-                onAccept: () => onAccept(r.sender.id),
-                onReject: () => onReject(r.sender.id),
-              )),
-          const SizedBox(height: 16),
-        ],
-        if (friends.isNotEmpty) ...[
-          const _SectionHeader(title: 'My Friends'),
-          ...friends.map((f) => _FriendTile(
-                friend: f,
-                onNudge: () => onNudge(f.id),
-              )),
-        ],
-      ],
-    );
-  }
-}
-
-class _RequestTile extends StatelessWidget {
-  const _RequestTile(
-      {required this.request, required this.onAccept, required this.onReject});
-  final FriendRequestModel request;
-  final VoidCallback onAccept;
-  final VoidCallback onReject;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = request.sender;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.darkSurface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.welfareBlue.withOpacity(0.4)),
-      ),
-      child: Row(
-        children: [
-          // FIXED: Used CustomAvatar
-          CustomAvatar(
-            url: s.profilePicture,
-            name: s.name,
-            size: 40,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(s.name,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.darkTextPrimary)),
-                Text('@${s.username}  •  🔥 ${s.currentStreakDays} days',
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.darkTextSecondary)),
+                        fontSize: 11,
+                        color: AppColors.darkTextSecondary)),
               ],
             ),
           ),
           Row(
             children: [
-              _SmallButton(
-                label: '✓',
-                color: AppColors.success,
-                onTap: onAccept,
-              ),
-              const SizedBox(width: 6),
-              _SmallButton(
-                label: '✕',
-                color: AppColors.danger,
-                onTap: onReject,
-              ),
+              const Text('🔥', style: TextStyle(fontSize: 13)),
+              const SizedBox(width: 2),
+              Text('${entry.currentStreak}',
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.flameOrange)),
             ],
           ),
         ],
@@ -454,10 +630,10 @@ class _RequestTile extends StatelessWidget {
   }
 }
 
-class _FriendTile extends StatelessWidget {
-  const _FriendTile({required this.friend, required this.onNudge});
-  final FriendModel friend;
-  final VoidCallback onNudge;
+// ── Activity feed ─────────────────────────────────────────────────────────────
+class _ActivityTile extends StatelessWidget {
+  const _ActivityTile({required this.item});
+  final FriendActivityItem item;
 
   @override
   Widget build(BuildContext context) {
@@ -471,80 +647,255 @@ class _FriendTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // FIXED: Used CustomAvatar
-          CustomAvatar(
-            url: friend.profilePicture,
-            name: friend.name,
-            size: 40,
-          ),
+          _MiniAvatar(
+              name: item.friendName,
+              color: AppColors.success,
+              picture: item.friendPicture),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(friend.name,
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.darkTextPrimary,
+                    height: 1.4),
+                children: [
+                  TextSpan(
+                    text: item.friendName.split(' ').first,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const TextSpan(text: ' completed '),
+                  TextSpan(
+                    text: '${item.habitIcon} ${item.habitName}',
                     style: const TextStyle(
-                        fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.darkTextPrimary)),
-                Text('@${friend.username}  •  Lv ${friend.level}',
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.darkTextSecondary)),
-              ],
+                        color: AppColors.success),
+                  ),
+                ],
+              ),
             ),
           ),
-          Row(
-            children: [
-              const Text('🔥', style: TextStyle(fontSize: 14)),
-              const SizedBox(width: 3),
-              Text('${friend.currentStreakDays}',
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.flameOrange)),
-              const SizedBox(width: 10),
-              GestureDetector(
-                onTap: onNudge,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.darkSurfaceElevated,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.darkBorder),
-                  ),
-                  child: const Text('👊',
-                      style: TextStyle(fontSize: 15)),
-                ),
-              ),
-            ],
-          ),
+          const SizedBox(width: 8),
+          Text(item.timeAgo,
+              style: const TextStyle(
+                  fontSize: 11, color: AppColors.darkTextSecondary)),
         ],
       ),
     );
   }
 }
 
-// ── Discover tab ─────────────────────────────────────────────────────────────
-class _DiscoverTab extends StatelessWidget {
-  const _DiscoverTab({required this.suggestions, required this.onAdd});
-  final List<FriendModel> suggestions;
-  final ValueChanged<String> onAdd;
+class _EmptyActivity extends StatelessWidget {
+  const _EmptyActivity();
 
   @override
   Widget build(BuildContext context) {
-    if (suggestions.isEmpty) {
-      return const _EmptyState(
-          emoji: '🔍', message: 'No suggestions right now.\nCheck back later!');
-    }
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.darkSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.darkBorder),
+      ),
+      child: const Column(
+        children: [
+          Text('😴', style: TextStyle(fontSize: 32)),
+          SizedBox(height: 8),
+          Text('No activity yet today',
+              style: TextStyle(color: AppColors.darkTextSecondary)),
+          SizedBox(height: 4),
+          Text('Your friends haven\'t completed any habits yet',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 11, color: AppColors.darkTextSecondary)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Discover tab ──────────────────────────────────────────────────────────────
+class _DiscoverTab extends ConsumerStatefulWidget {
+  const _DiscoverTab({
+    required this.suggestions,
+    required this.searchResults,
+    required this.searchLoading,
+    required this.onSearch,
+    required this.onClearSearch,
+    required this.onAdd,
+  });
+  final List<FriendModel> suggestions;
+  final List<FriendModel> searchResults;
+  final bool searchLoading;
+  final ValueChanged<String> onSearch;
+  final VoidCallback onClearSearch;
+  final ValueChanged<String> onAdd;
+
+  @override
+  ConsumerState<_DiscoverTab> createState() => _DiscoverTabState();
+}
+
+class _DiscoverTabState extends ConsumerState<_DiscoverTab> {
+  final _searchCtrl = TextEditingController();
+  bool _isSearching = false;
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final showSearchResults =
+        _isSearching && _searchCtrl.text.trim().length >= 2;
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       children: [
-        const _SectionHeader(title: 'People you may know'),
-        ...suggestions.map((s) => _SuggestionTile(
-              friend: s,
-              onAdd: () => onAdd(s.id),
-            )),
+        // Search bar
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.darkSurface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.darkBorder),
+          ),
+          child: TextField(
+            controller: _searchCtrl,
+            style: const TextStyle(
+                color: AppColors.darkTextPrimary, fontSize: 14),
+            onChanged: (v) {
+              setState(() => _isSearching = v.trim().isNotEmpty);
+              widget.onSearch(v);
+            },
+            decoration: InputDecoration(
+              hintText: 'Search by username or name...',
+              hintStyle: const TextStyle(
+                  color: AppColors.darkTextSecondary, fontSize: 13),
+              prefixIcon: const Icon(Icons.search_rounded,
+                  color: AppColors.darkTextSecondary, size: 20),
+              suffixIcon: _searchCtrl.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded,
+                          color: AppColors.darkTextSecondary,
+                          size: 18),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _isSearching = false);
+                        widget.onClearSearch();
+                      },
+                    )
+                  : null,
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 13),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        if (widget.searchLoading)
+          const Center(
+              child: Padding(
+            padding: EdgeInsets.all(20),
+            child: CircularProgressIndicator(
+                color: AppColors.flameOrange, strokeWidth: 2),
+          ))
+        else if (showSearchResults) ...[
+          const _SectionLabel(label: 'SEARCH RESULTS'),
+          if (widget.searchResults.isEmpty)
+            const _EmptySearch()
+          else
+            ...widget.searchResults.map((u) => _SearchResultTile(
+                  user: u,
+                  onAdd: () => widget.onAdd(u.id),
+                )),
+        ] else ...[
+          const _SectionLabel(label: 'PEOPLE YOU MAY KNOW'),
+          if (widget.suggestions.isEmpty)
+            const _EmptySuggestions()
+          else
+            ...widget.suggestions.map((s) => _SuggestionTile(
+                  friend: s,
+                  onAdd: () => widget.onAdd(s.id),
+                )),
+        ],
       ],
+    );
+  }
+}
+
+class _SearchResultTile extends StatelessWidget {
+  const _SearchResultTile({required this.user, required this.onAdd});
+  final FriendModel user;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.darkSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.darkBorder),
+      ),
+      child: Row(
+        children: [
+          _MiniAvatar(
+              name: user.name,
+              color: AppColors.prayerPurple,
+              picture: user.profilePicture),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(user.name,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.darkTextPrimary)),
+                Text('@${user.username} · 🔥 ${user.currentStreakDays}',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.darkTextSecondary)),
+              ],
+            ),
+          ),
+          if (user.isFriend)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: AppColors.success.withOpacity(0.35)),
+              ),
+              child: const Text('Friends',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w600)),
+            )
+          else if (user.requestSent)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.darkBorder,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text('Sent',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.darkTextSecondary)),
+            )
+          else
+            _AddBtn(onAdd: onAdd),
+        ],
+      ),
     );
   }
 }
@@ -566,12 +917,10 @@ class _SuggestionTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // FIXED: Used CustomAvatar
-          CustomAvatar(
-            url: friend.profilePicture,
-            name: friend.name,
-            size: 40,
-          ),
+          _MiniAvatar(
+              name: friend.name,
+              color: AppColors.success,
+              picture: friend.profilePicture),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -582,74 +931,153 @@ class _SuggestionTile extends StatelessWidget {
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: AppColors.darkTextPrimary)),
-                Text('@${friend.username}  •  🔥 ${friend.currentStreakDays}',
+                Text(
+                    '@${friend.username} · 🔥 ${friend.currentStreakDays} days',
                     style: const TextStyle(
-                        fontSize: 11, color: AppColors.darkTextSecondary)),
+                        fontSize: 11,
+                        color: AppColors.darkTextSecondary)),
               ],
             ),
           ),
-          GestureDetector(
-            onTap: onAdd,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                    colors: [Color(0xFFF2A33D), Color(0xFFE8762B)]),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Text('+ Add',
+          _AddBtn(onAdd: onAdd),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Invite bar ────────────────────────────────────────────────────────────────
+class _InviteBar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+      decoration: BoxDecoration(
+        color: AppColors.darkSurface,
+        border:
+            const Border(top: BorderSide(color: AppColors.darkBorder)),
+      ),
+      child: GestureDetector(
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Invite feature coming soon!')),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.success, Color(0xFF17876D)],
+            ),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.person_add_rounded,
+                  color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text('+ Invite Friends',
                   style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: Colors.white)),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.badge});
-  final String title;
-  final String? badge;
+class _MiniAvatar extends StatelessWidget {
+  const _MiniAvatar({
+    required this.name,
+    required this.color,
+    this.picture,
+    this.size = 38,
+  });
+  final String name;
+  final Color color;
+  final String? picture;
+  final double size;
+
+  String get _initials {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.darkTextPrimary)),
-          if (badge != null) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.flameOrange,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(badge!,
-                  style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white)),
-            ),
-          ],
-        ],
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withOpacity(0.15),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: picture != null
+          ? ClipOval(
+              child: Image.network(picture!, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _Initial(
+                      initials: _initials, color: color, size: size)))
+          : _Initial(initials: _initials, color: color, size: size),
+    );
+  }
+}
+
+class _Initial extends StatelessWidget {
+  const _Initial(
+      {required this.initials,
+      required this.color,
+      required this.size});
+  final String initials;
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Text(initials,
+            style: TextStyle(
+                fontSize: size * 0.36,
+                fontWeight: FontWeight.w700,
+                color: color)),
+      );
+}
+
+class _AddBtn extends StatelessWidget {
+  const _AddBtn({required this.onAdd});
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onAdd,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+              colors: [Color(0xFFF2A33D), Color(0xFFE8762B)]),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Text('+ Add',
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Colors.white)),
       ),
     );
   }
 }
 
-class _SmallButton extends StatelessWidget {
-  const _SmallButton({required this.label, required this.color, required this.onTap});
+class _SmallBtn extends StatelessWidget {
+  const _SmallBtn(
+      {required this.label,
+      required this.color,
+      required this.onTap});
   final String label;
   final Color color;
   final VoidCallback onTap;
@@ -668,32 +1096,94 @@ class _SmallButton extends StatelessWidget {
         ),
         child: Center(
           child: Text(label,
-              style: TextStyle(color: color, fontWeight: FontWeight.w700)),
+              style: TextStyle(
+                  color: color, fontWeight: FontWeight.w700)),
         ),
       ),
     );
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.emoji, required this.message});
-  final String emoji;
-  final String message;
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.label});
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 48)),
-          const SizedBox(height: 16),
-          Text(message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 14, color: AppColors.darkTextSecondary, height: 1.5)),
-        ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(label,
+          style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.darkTextSecondary,
+              letterSpacing: 0.6)),
+    );
+  }
+}
+
+class _EmptySearch extends StatelessWidget {
+  const _EmptySearch();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(24),
+        child: Column(
+          children: [
+            Text('🔍', style: TextStyle(fontSize: 36)),
+            SizedBox(height: 10),
+            Text('No users found',
+                style:
+                    TextStyle(color: AppColors.darkTextSecondary)),
+          ],
+        ),
       ),
     );
   }
+}
+
+class _EmptySuggestions extends StatelessWidget {
+  const _EmptySuggestions();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(24),
+        child: Column(
+          children: [
+            Text('👥', style: TextStyle(fontSize: 36)),
+            SizedBox(height: 10),
+            Text('No suggestions right now',
+                style: TextStyle(color: AppColors.darkTextSecondary)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Tab bar persistent header ─────────────────────────────────────────────────
+class _TabBarDelegate extends SliverPersistentHeaderDelegate {
+  const _TabBarDelegate(this.tabBar);
+  final TabBar tabBar;
+
+  @override
+  double get minExtent => 46;
+  @override
+  double get maxExtent => 46;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset,
+      bool overlapsContent) {
+    return Container(
+      color: AppColors.darkBg,
+      child: tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_TabBarDelegate old) => false;
 }
