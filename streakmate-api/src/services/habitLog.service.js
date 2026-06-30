@@ -3,7 +3,7 @@ import { getTodayDate } from '../utils/dateHelper.js'
 import { streakService } from './streak.service.js'
 import { dayLogService } from './dayLog.service.js'
 import { enqueueAchievementCheck } from '../config/bullmq.js'
-import { emitToUser, SOCKET_EVENTS } from '../config/socket.js'
+import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
 import { gamificationService } from './gamification.service.js'
 
 export const habitLogService = {
@@ -111,6 +111,11 @@ export const habitLogService = {
     if (isCompleted && !wasCompleted) {
       await gamificationService.awardXP(userId, 10, `subtask_complete:${subtaskId}`)
     }
+
+    if (isCompleted && !wasCompleted) {
+  console.log(`💰 Awarding XP to ${userId} for subtask ${subtaskId}`)
+  await gamificationService.awardXP(userId, 10, `subtask_complete:${subtaskId}`)
+}
 
     // If just completed — trigger streak update + achievement check
     if (isComplete) {

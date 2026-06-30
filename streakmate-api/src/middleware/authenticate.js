@@ -21,7 +21,6 @@ export const authenticate = async (req, reply) => {
     }
     const token = authHeader.split(' ')[1]
     let decoded
-    console.log('INCOMING TOKEN:', token)
     try {
       decoded = verifyAccessToken(token)
     } catch (err) {

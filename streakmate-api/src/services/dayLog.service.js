@@ -1,7 +1,7 @@
 import { DayLog, HabitLog, Habit, User } from '../models/index.js'
 import { getTodayDate, getMonthRange, formatDate } from '../utils/dateHelper.js'
 import { streakService } from './streak.service.js'
-import { emitToUser, SOCKET_EVENTS } from '../config/socket.js'
+import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
 
 export const dayLogService = {
   // ── Get today's daylog (upsert) ──────────────────────────────────

@@ -1,7 +1,7 @@
 import { User, FriendRequest } from '../models/index.js'
 import { Streak, HabitLog } from '../models/index.js'
 import { notificationService } from './notification.service.js'
-import { emitToUser, SOCKET_EVENTS } from '../config/socket.js'
+import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
 import { getTodayDate } from '../utils/dateHelper.js'
 
 export const friendsService = {

@@ -1,7 +1,7 @@
 import { Streak, DayLog, HabitLog, User } from '../models/index.js'
 import { getTodayDate, getPreviousDate, daysBetween } from '../utils/dateHelper.js'
 import { deleteCache, CACHE_KEYS, setCache, TTL } from '../config/redis.js'
-import { emitToUser, SOCKET_EVENTS } from '../config/socket.js'
+import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
 import { enqueueAchievementCheck } from '../config/bullmq.js'
 
 export const streakService = {

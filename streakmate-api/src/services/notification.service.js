@@ -1,6 +1,6 @@
 import { Notification, NotificationTemplate, FCMToken, User, Habit } from '../models/index.js'
 import { sendPushNotification, sendMulticastNotification } from '../config/fcm.js'
-import { emitToUser, SOCKET_EVENTS } from '../config/socket.js'
+import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
 
 export const notificationService = {
   // ── Register FCM token ───────────────────────────────────────────

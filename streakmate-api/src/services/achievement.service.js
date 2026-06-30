@@ -1,7 +1,7 @@
 import { Achievement, UserAchievement, User, Streak } from '../models/index.js'
 import { notificationService } from './notification.service.js'
 import { gamificationService } from './gamification.service.js'
-import { emitToUser, SOCKET_EVENTS } from '../config/socket.js'
+import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
 
 // ─── Achievement condition checkers ──────────────────────────────────────────
 const CONDITION_CHECKERS = {
