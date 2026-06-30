@@ -355,7 +355,11 @@ class _LevelXpCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double progress = nextLevelXp > 0 ? (currentXp / nextLevelXp).clamp(0.0, 1.0) : 0.0;
+
+    final int totalXpForNextLevel = currentXp + nextLevelXp;
+    final double progress = totalXpForNextLevel > 0
+        ? (currentXp / totalXpForNextLevel).clamp(0.0, 1.0)
+        : 0.0;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -371,10 +375,7 @@ class _LevelXpCard extends StatelessWidget {
               // Mountain Icon (Using built-in Material icon as requested)
               const Icon(Icons.terrain_rounded, color: Colors.white70, size: 22),
               const SizedBox(width: 8),
-
-              Text(
-                'Level $level',
-                style: const TextStyle(
+              Text('Level $level',style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
@@ -382,8 +383,7 @@ class _LevelXpCard extends StatelessWidget {
               ),
               const Spacer(),
 
-              Text(
-                '$currentXp / $nextLevelXp XP',
+              Text('$currentXp / $totalXpForNextLevel XP',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -423,65 +423,6 @@ class _LevelXpCard extends StatelessWidget {
     );
   }
 }
-
-// ── Avatar widget (Unchanged visually, just moved) ───────────────────────────
-// class _Avatar extends StatelessWidget {
-//   const _Avatar({required this.url, required this.name, required this.size});
-//   final String? url;
-//   final String name;
-//   final double size;
-
-//   String get _initials {
-//     final parts = name.trim().split(' ');
-//     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-//     return name.isNotEmpty ? name[0].toUpperCase() : '?';
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Container(
-//       width: size,
-//       height: size,
-//       decoration: BoxDecoration(
-//         shape: BoxShape.circle,
-//         border: Border.all(color: AppColors.flameOrange, width: 2.5),
-//         boxShadow: [
-//           BoxShadow(
-//             color: AppColors.flameOrange.withOpacity(0.35),
-//             blurRadius: 16,
-//             spreadRadius: 2,
-//           ),
-//         ],
-//       ),
-//       child: ClipOval(
-//         child: Image.asset(
-//           'assets/images/defaultAvatar.png', // <--- YOUR LOCAL IMAGE
-//           fit: BoxFit.contain,
-//         ),
-//       ),
-//     );
-//   }
-// }
-
-// class _InitialsFallback extends StatelessWidget {
-//   const _InitialsFallback(
-//       {required this.initials, required this.size});
-//   final String initials;
-//   final double size;
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Center(
-//       child: Text(
-//         initials,
-//         style: TextStyle(
-//             fontSize: size * 0.33,
-//             fontWeight: FontWeight.w800,
-//             color: Colors.white),
-//       ),
-//     );
-//   }
-// }
 
 // ── Stat tile (Unchanged) ───────────────────────────────────────────────────
 class _StatTile extends StatelessWidget {

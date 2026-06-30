@@ -133,6 +133,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(status: AuthStatus.authenticated, user: user);
   }
 
+  void updateXP({required int xpPoints, required int level}) {
+    if (state.user == null) return;
+    state = state.copyWith(
+      user: state.user!.copyWith(
+        xpPoints: xpPoints,
+        level: level,
+      ),
+    );
+  }
+
   void clearError() {
     state = state.copyWith(errorMessage: null);
   }
