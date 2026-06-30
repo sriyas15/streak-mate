@@ -56,8 +56,7 @@ export const initSocket = (httpServer) => {
   // ─── Connection ──────────────────────────────────────────────────
   io.on('connection', (socket) => {
     const userId = socket.userId
-
-    // Track online users
+  // Track online users
     if (!onlineUsers.has(userId)) onlineUsers.set(userId, new Set())
     onlineUsers.get(userId).add(socket.id)
 

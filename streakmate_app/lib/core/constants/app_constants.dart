@@ -7,6 +7,7 @@ class AppConstants {
   // Base URL is injected via --dart-define=API_BASE_URL=... or .env (see
   // core/network/dio_client.dart). This is just a fallback for local dev.
   static const String apiBaseUrlFallback = 'http://10.0.2.2:5000/api/v1';
+  static const String apiSocketUrl = 'http://10.0.2.2:5000';
 
   static const Duration connectTimeout = Duration(seconds: 15);
   static const Duration receiveTimeout = Duration(seconds: 15);
