@@ -1,6 +1,6 @@
 import { SOCKET_EVENTS } from '../events.js'
 import { User, Streak } from '../../models/index.js'
-import { isUserOnline } from '../../config/socket.js'
+import { isUserOnline } from '../index.js'
 
 /**
  * Streak handler

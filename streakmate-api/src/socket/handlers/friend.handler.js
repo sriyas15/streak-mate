@@ -1,7 +1,7 @@
 import { SOCKET_EVENTS } from '../events.js'
 import { User } from '../../models/index.js'
 import { notificationService } from '../../services/notification.service.js'
-import { isUserOnline } from '../../config/socket.js'
+import { isUserOnline } from '../index.js'
 
 /**
  * Friend handler
