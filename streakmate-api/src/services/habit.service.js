@@ -16,31 +16,74 @@ export const habitService = {
   },
 
   // ── Create habit ────────────────────────────────────────────────
-  createHabit: async (userId, body) => {
-    const count = await Habit.countDocuments({ userId, isActive: true, isArchived: false })
-    if (count >= 10) throwBadRequest('Maximum 10 active habits allowed')
+createHabit: async (userId, body) => {
+  const count = await Habit.countDocuments({ userId, isActive: true, isArchived: false })
+  if (count >= 10) throwBadRequest('Maximum 10 active habits allowed')
 
-    const habit = await Habit.create({
-      userId,
-      name: body.name,
-      category: body.category,
-      icon: body.icon,
-      color: body.color,
-      description: body.description,
-      frequency: body.frequency || 'daily',
-      activeDays: body.activeDays || [0, 1, 2, 3, 4, 5, 6],
-      startDate: body.startDate || getTodayDate(),
-      completionRule: body.completionRule || 'all_required',
-      completionThreshold: body.completionThreshold || 100,
-      reminderEnabled: body.reminderEnabled || false,
-      reminderTimes: body.reminderTimes || [],
-      isCustom: body.category === 'custom',
-      displayOrder: count, // append to end
-    })
+  const existing = await Habit.findOne({
+    userId, category: body.category, name: body.name,
+    isActive: true, isArchived: false,
+  })
+  if (existing) throwBadRequest(`You already have a "${body.name}" habit`)
 
-    await deletePattern(`user:${userId}:today:*`)
-    return habit
-  },
+  const habit = await Habit.create({
+    userId,
+    name: body.name,
+    category: body.category,
+    icon: body.icon,
+    color: body.color,
+    description: body.description,
+    frequency: body.frequency || 'daily',
+    activeDays: body.activeDays || [0, 1, 2, 3, 4, 5, 6],
+    startDate: body.startDate || getTodayDate(),
+    completionRule: body.completionRule || 'all_required',
+    completionThreshold: body.completionThreshold || 100,
+    reminderEnabled: body.reminderEnabled || false,
+    reminderTimes: body.reminderTimes || [],
+    isCustom: body.category === 'custom',
+    displayOrder: count,
+  })
+
+  // Template subtasks
+  const template = HABIT_TEMPLATES.find((t) => t.category === body.category)
+  let subtaskDocs = []
+  if (template && template.subtasks?.length > 0) {
+    subtaskDocs = await Subtask.insertMany(
+      template.subtasks.map((st, i) => ({
+        habitId: habit._id,
+        userId,
+        name: st.name,
+        inputType: st.inputType || 'checkbox',
+        unit: st.unit || null,
+        targetValue: st.targetValue || null,
+        isRequired: st.isRequired !== false,
+        displayOrder: st.displayOrder ?? i,
+      }))
+    )
+  }
+
+  // ── NEW: user's custom subtasks (plain strings from the UI) ────
+  if (body.customSubtasks && body.customSubtasks.length > 0) {
+    const customDocs = await Subtask.insertMany(
+      body.customSubtasks.map((name, i) => ({
+        habitId: habit._id,
+        userId,
+        name,
+        inputType: 'checkbox',
+        isRequired: true,
+        displayOrder: subtaskDocs.length + i,
+      }))
+    )
+    subtaskDocs = [...subtaskDocs, ...customDocs]
+  }
+
+  await deletePattern(`user:${userId}:today:*`)
+
+  return {
+    ...habit.toObject(),
+    subtasks: subtaskDocs,
+  }
+},
 
   // ── Get single habit ─────────────────────────────────────────────
   getHabit: async (userId, habitId) => {

@@ -5,19 +5,18 @@ import '../models/remote/habit_model.dart';
 import '../repositories/habit_repository.dart';
 
 class AddHabitState {
-  // Step 1 — template selection
   final String? selectedCategory;
   final String? selectedName;
   final String? selectedIcon;
   final String? selectedColor;
 
-  // Step 2 — customisation
   final String customName;
   final String? description;
   final String frequency; // daily | custom
   final List<int> activeDays;
 
-  // Submit state
+  final List<String> customSubtasks;
+
   final bool saving;
   final String? error;
   final HabitModel? createdHabit;
@@ -31,6 +30,7 @@ class AddHabitState {
     this.description,
     this.frequency = 'daily',
     this.activeDays = const [0, 1, 2, 3, 4, 5, 6],
+    this.customSubtasks = const [],
     this.saving = false,
     this.error,
     this.createdHabit,
@@ -45,6 +45,7 @@ class AddHabitState {
     String? description,
     String? frequency,
     List<int>? activeDays,
+    List<String>? customSubtasks,
     bool? saving,
     String? error,
     HabitModel? createdHabit,
@@ -58,6 +59,7 @@ class AddHabitState {
         description: description ?? this.description,
         frequency: frequency ?? this.frequency,
         activeDays: activeDays ?? this.activeDays,
+        customSubtasks: customSubtasks ?? this.customSubtasks,
         saving: saving ?? this.saving,
         error: error,
         createdHabit: createdHabit ?? this.createdHabit,
@@ -105,6 +107,20 @@ class AddHabitNotifier extends StateNotifier<AddHabitState> {
     state = state.copyWith(activeDays: days);
   }
 
+  // ── Custom subtasks ────────────────────────────────────────────
+  void addCustomSubtask(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    state = state.copyWith(
+      customSubtasks: [...state.customSubtasks, trimmed],
+    );
+  }
+
+  void removeCustomSubtask(int index) {
+    final list = List<String>.from(state.customSubtasks)..removeAt(index);
+    state = state.copyWith(customSubtasks: list);
+  }
+
   Future<bool> save() async {
     if (state.selectedCategory == null) {
       state = state.copyWith(error: 'Please select a habit category');
@@ -125,6 +141,7 @@ class AddHabitNotifier extends StateNotifier<AddHabitState> {
         description: state.description,
         frequency: state.frequency,
         activeDays: state.activeDays,
+        customSubtasks: state.customSubtasks,
       );
       state = state.copyWith(saving: false, createdHabit: habit);
       debugPrint('[AddHabit] Created: ${habit.name} (${habit.id})');

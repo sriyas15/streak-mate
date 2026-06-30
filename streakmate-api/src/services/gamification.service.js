@@ -1,6 +1,6 @@
 import { User } from '../models/index.js'
 import { deleteCache, CACHE_KEYS } from '../config/redis.js'
-import { emitToUser, SOCKET_EVENTS } from '../config/socket.js'
+import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
 import { notificationService } from './notification.service.js'
 
 // ─── XP thresholds per level ─────────────────────────────────────────────────
@@ -119,6 +119,14 @@ export const gamificationService = {
       timestamp: new Date().toISOString(),
     }))
     await redis.ltrim(key, 0, 99) // keep last 100
+    // Level-up notification + socket
+    // Always emit XP earned
+    emitToUser(userId, SOCKET_EVENTS.XP_EARNED, {
+      amount,
+      reason,
+      total: newXP,
+      level: newLevel,
+    })
 
     // Level-up notification + socket
     if (leveledUp) {
@@ -129,8 +137,7 @@ export const gamificationService = {
         deepLinkScreen: 'Profile',
       })
 
-      emitToUser(userId, SOCKET_EVENTS.STREAK_MILESTONE, {
-        type: 'level_up',
+      emitToUser(userId, SOCKET_EVENTS.LEVEL_UP, {   // ← was STREAK_MILESTONE, wrong event
         newLevel,
         xpPoints: newXP,
       })

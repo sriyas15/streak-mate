@@ -9,6 +9,7 @@ import '../../../providers/onboarding_provider.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../widgets/step_indicator.dart';
 import '../widgets/subtask_tile.dart';
+import '../../../shared/widgets/add_custom_subtask_row.dart';
 
 /// subtask_setup_screen.dart
 class SubtaskSetupScreen extends ConsumerWidget {
@@ -164,13 +165,11 @@ class SubtaskSetupScreen extends ConsumerWidget {
                                     .toggleSubtask(habit.id, subtask.id),
                               );
                             }),
-                            _AddCustomSubtaskRow(
+                            AddCustomSubtaskRow(   // was _AddCustomSubtaskRow
                               color: color,
-                              onAdd: (name) => ref
-                                  .read(onboardingProvider.notifier)
-                                  .addCustomSubtaskDraft(habit.id, name),
+                              onAdd: (name) => ref.read(onboardingProvider.notifier).addCustomSubtaskDraft(habit.id, name),
                             ),
-                          ],
+],
                         ),
                       );
                     },

@@ -21,6 +21,7 @@ class HabitRepository {
     String frequency = 'daily',
     List<int> activeDays = const [0, 1, 2, 3, 4, 5, 6],
     String? startDate,
+    List<String> customSubtasks = const [],
   }) async {
     try {
       final today = startDate ?? _today();
@@ -40,6 +41,7 @@ class HabitRepository {
           'completionThreshold': 100,
           'reminderEnabled': false,
           'reminderTimes': [],
+          'customSubtasks': customSubtasks,
         },
         options: Options(headers: {'Content-Type': 'application/json'}),
       );

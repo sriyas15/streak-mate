@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../models/remote/habit_template_model.dart';
 import '../../../providers/add_habit_provider.dart';
 import '../../../providers/home_provider.dart';
+import '../../../shared/widgets/add_custom_subtask_row.dart';
 
 class AddHabitScreen extends ConsumerStatefulWidget {
   const AddHabitScreen({super.key});
@@ -41,9 +42,8 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
 
     final success = await ref.read(addHabitProvider.notifier).save();
     if (success && mounted) {
-      // Refresh home screen habit list
       ref.read(homeProvider.notifier).loadToday();
-      Navigator.pop(context, true); // true = habit was added
+      Navigator.pop(context, true);
     }
   }
 
@@ -255,7 +255,6 @@ class _CustomiseForm extends ConsumerWidget {
   final VoidCallback onSave;
 
   static const _days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-  // 0=Sun…6=Sat matches backend activeDays
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -267,7 +266,6 @@ class _CustomiseForm extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       children: [
-        // ── Selected template badge ───────────────────────────
         Row(
           children: [
             Container(
@@ -307,7 +305,6 @@ class _CustomiseForm extends ConsumerWidget {
         ),
         const SizedBox(height: 24),
 
-        // ── Habit name ────────────────────────────────────────
         _Label(label: 'HABIT NAME'),
         _DarkField(
           controller: nameCtrl,
@@ -319,7 +316,6 @@ class _CustomiseForm extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
 
-        // ── Description ───────────────────────────────────────
         _Label(label: 'DESCRIPTION (OPTIONAL)'),
         _DarkField(
           controller: descCtrl,
@@ -332,7 +328,6 @@ class _CustomiseForm extends ConsumerWidget {
         ),
         const SizedBox(height: 20),
 
-        // ── Schedule ──────────────────────────────────────────
         _Label(label: 'SCHEDULE'),
         Container(
           padding: const EdgeInsets.all(16),
@@ -344,7 +339,6 @@ class _CustomiseForm extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Frequency toggle
               Row(
                 children: [
                   _FreqChip(
@@ -419,7 +413,6 @@ class _CustomiseForm extends ConsumerWidget {
         ),
         const SizedBox(height: 20),
 
-        // ── Default subtasks preview ──────────────────────────
         if (_subtasksForCategory(state.selectedCategory).isNotEmpty) ...[
           _Label(label: 'DEFAULT SUBTASKS'),
           Container(
@@ -502,7 +495,49 @@ class _CustomiseForm extends ConsumerWidget {
           const SizedBox(height: 24),
         ],
 
-        // ── Save button ───────────────────────────────────────
+        // ── Custom subtasks ─────────────────────────────────────
+        _Label(label: 'CUSTOM SUBTASKS'),
+        ...state.customSubtasks.asMap().entries.map((entry) {
+          final i = entry.key;
+          final name = entry.value;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.darkSurface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.darkBorder),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.check_box_outline_blank_rounded,
+                    size: 16, color: color),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(name,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.darkTextPrimary)),
+                ),
+                GestureDetector(
+                  onTap: () => ref
+                      .read(addHabitProvider.notifier)
+                      .removeCustomSubtask(i),
+                  child: const Icon(Icons.close_rounded,
+                      size: 16, color: AppColors.darkTextSecondary),
+                ),
+              ],
+            ),
+          );
+        }),
+        AddCustomSubtaskRow(
+          color: color,
+          onAdd: (name) =>
+              ref.read(addHabitProvider.notifier).addCustomSubtask(name),
+        ),
+        const SizedBox(height: 24),
+
         SizedBox(
           width: double.infinity,
           height: 52,
@@ -560,7 +595,6 @@ class _CustomiseForm extends ConsumerWidget {
   }
 }
 
-// ── Shared widgets ────────────────────────────────────────────────────────────
 class _Label extends StatelessWidget {
   const _Label({required this.label});
   final String label;
