@@ -81,34 +81,39 @@ class _HomeTab extends ConsumerStatefulWidget {
 
 class _HomeTabState extends ConsumerState<_HomeTab> {
   @override
-  void initState() {
-    super.initState();
-    Future.microtask(() => ref.read(homeProvider.notifier).loadToday());
-  }
+void initState() {
+  super.initState();
+  Future.microtask(() async {
+    await ref.read(homeProvider.notifier).loadToday();
+    if (!mounted) return;
+    final missed = ref.read(homeProvider).missedYesterdayDate;
+    if (missed != null) {
+      _showMissedYesterdayDialog(context, ref, missed);
+    }
+  });
+}
 
   @override
   Widget build(BuildContext context) {
     final homeState = ref.watch(homeProvider);
     final user = ref.watch(authProvider).user;
 
-    ref.listen<HomeState>(homeProvider, (_, next) {
-      if (next.errorMessage != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.errorMessage!),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-        ref.read(homeProvider.notifier).clearError();
+    ref.listen<HomeState>(homeProvider, (previous, next) {
+  if (next.errorMessage != null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(next.errorMessage!), backgroundColor: AppColors.danger),
+    );
+    ref.read(homeProvider.notifier).clearError();
+  }
+
+  if (previous?.missedYesterdayDate == null && next.missedYesterdayDate != null) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) {
+        _showMissedYesterdayDialog(context, ref, next.missedYesterdayDate!);
       }
-      if (next.missedYesterdayDate != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          _showMissedYesterdayDialog(context, ref, next.missedYesterdayDate!);
-        }
-      });
-    }
     });
+  }
+});
 
     final firstName = user?.name.split(' ').first ?? 'Riyan';
     final streak = user?.currentStreakDays ?? 28;
