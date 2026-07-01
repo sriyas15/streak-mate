@@ -127,6 +127,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 
+  void updateFreezeBalance({
+    required int freezesRemaining,
+    required int freezesUsed,
+    required int cheatDaysRemaining,
+    required int cheatDaysUsed,
+  }) {
+    if (state.user == null) return;
+    state = state.copyWith(
+      user: state.user!.copyWith(
+        freezesRemaining: freezesRemaining,
+        freezesUsed: freezesUsed,
+        cheatDaysRemaining: cheatDaysRemaining,
+        cheatDaysUsed: cheatDaysUsed,
+      ),
+    );
+  }
+
   /// Called after a successful profile update so the UI reflects the
   /// new name/bio/username without needing a full /auth/me re-fetch.
   void setUser(UserModel user) {

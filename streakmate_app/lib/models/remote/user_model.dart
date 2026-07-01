@@ -41,6 +41,9 @@ class UserModel {
   final bool notificationsEnabled;
   final String theme;
 
+   // Timestamps
+  final DateTime? createdAt;
+
   const UserModel({
     required this.id,
     required this.name,
@@ -68,6 +71,7 @@ class UserModel {
     required this.isEmailVerified,
     required this.notificationsEnabled,
     required this.theme,
+    this.createdAt,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -98,6 +102,7 @@ class UserModel {
       isEmailVerified: json['isEmailVerified'] as bool? ?? false,
       notificationsEnabled: json['notificationsEnabled'] as bool? ?? true,
       theme: json['theme'] as String? ?? 'dark',
+      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
     );
   }
 
@@ -105,6 +110,13 @@ class UserModel {
     bool? onboardingCompleted,
     int? onboardingStep,
     String? selectedGoal,
+    int? level,
+    int? xpPoints,
+    int? xpToNextLevel,
+    int? freezesUsed,        
+    int? freezesRemaining,   
+    int? cheatDaysUsed,      
+    int? cheatDaysRemaining, 
   }) {
     return UserModel(
       id: id,
@@ -120,19 +132,20 @@ class UserModel {
       currentStreakDays: currentStreakDays,
       bestStreakDays: bestStreakDays,
       lastProductiveDate: lastProductiveDate,
-      level: level,
-      xpPoints: xpPoints,
-      xpToNextLevel: xpToNextLevel,
+      level: level ?? this.level,
+      xpPoints: xpPoints ?? this.xpPoints,
+      xpToNextLevel: xpToNextLevel ?? this.xpToNextLevel,
       totalFreezesAlloted: totalFreezesAlloted,
-      freezesUsed: freezesUsed,
-      freezesRemaining: freezesRemaining,
+      freezesUsed: freezesUsed ?? this.freezesUsed,             
+      freezesRemaining: freezesRemaining ?? this.freezesRemaining, 
       cheatDaysAlloted: cheatDaysAlloted,
-      cheatDaysUsed: cheatDaysUsed,
-      cheatDaysRemaining: cheatDaysRemaining,
+      cheatDaysUsed: cheatDaysUsed ?? this.cheatDaysUsed,         
+      cheatDaysRemaining: cheatDaysRemaining ?? this.cheatDaysRemaining, 
       authProvider: authProvider,
       isEmailVerified: isEmailVerified,
       notificationsEnabled: notificationsEnabled,
       theme: theme,
+      createdAt: createdAt,
     );
   }
 }

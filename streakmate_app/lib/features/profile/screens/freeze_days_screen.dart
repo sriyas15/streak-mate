@@ -2,20 +2,90 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/freeze_provider.dart';
 
-class FreezeDaysScreen extends ConsumerWidget {
+class FreezeDaysScreen extends ConsumerStatefulWidget {
   const FreezeDaysScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FreezeDaysScreen> createState() => _FreezeDaysScreenState();
+}
+
+class _FreezeDaysScreenState extends ConsumerState<FreezeDaysScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(freezeProvider.notifier).loadBalance());
+  }
+
+  Future<void> _confirmAndActivate({
+    required String title,
+    required String message,
+    required Future<bool> Function() action,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.darkSurface,
+        title: Text(title,
+            style: const TextStyle(color: AppColors.darkTextPrimary)),
+        content: Text(message,
+            style: const TextStyle(color: AppColors.darkTextSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppColors.darkTextSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirm',
+                style: TextStyle(color: AppColors.flameOrange)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await action();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final freezeState = ref.watch(freezeProvider);
     final user = ref.watch(authProvider).user;
 
+    ref.listen<FreezeState>(freezeProvider, (_, next) {
+      if (next.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(next.error!),
+              backgroundColor: AppColors.danger),
+        );
+        ref.read(freezeProvider.notifier).clearMessages();
+      } else if (next.successMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(next.successMessage!),
+              backgroundColor: AppColors.success),
+        );
+        ref.read(freezeProvider.notifier).clearMessages();
+      }
+    });
+
+    // Prefer freshest balance from freezeProvider; fall back to authProvider user
     final freezesTotal = user?.totalFreezesAlloted ?? 3;
-    final freezesUsed = user?.freezesUsed ?? 0;
-    final freezesLeft = user?.freezesRemaining ?? 3;
+    final freezesUsed =
+        freezeState.balance?.freezesUsed ?? user?.freezesUsed ?? 0;
+    final freezesLeft =
+        freezeState.balance?.freezesRemaining ?? user?.freezesRemaining ?? 3;
     final cheatTotal = user?.cheatDaysAlloted ?? 2;
-    final cheatUsed = user?.cheatDaysUsed ?? 0;
-    final cheatLeft = user?.cheatDaysRemaining ?? 2;
+    final cheatUsed =
+        freezeState.balance?.cheatDaysUsed ?? user?.cheatDaysUsed ?? 0;
+    final cheatLeft = freezeState.balance?.cheatDaysRemaining ??
+        user?.cheatDaysRemaining ??
+        2;
 
     return Scaffold(
       backgroundColor: AppColors.darkBg,
@@ -45,6 +115,17 @@ class FreezeDaysScreen extends ConsumerWidget {
             used: freezesUsed,
             total: freezesTotal,
             remaining: freezesLeft,
+            buttonLabel: 'Freeze Today',
+            isLoading: freezeState.activating,
+            onActivate: freezesLeft <= 0
+                ? null
+                : () => _confirmAndActivate(
+                      title: 'Freeze today?',
+                      message:
+                          "This will use 1 of your $freezesTotal monthly freezes to protect today's streak.",
+                      action: () =>
+                          ref.read(freezeProvider.notifier).activateFreeze(),
+                    ),
           ),
           const SizedBox(height: 14),
 
@@ -57,6 +138,18 @@ class FreezeDaysScreen extends ConsumerWidget {
             used: cheatUsed,
             total: cheatTotal,
             remaining: cheatLeft,
+            buttonLabel: 'Use Cheat Day',
+            isLoading: freezeState.activating,
+            onActivate: cheatLeft <= 0
+                ? null
+                : () => _confirmAndActivate(
+                      title: 'Use a cheat day?',
+                      message:
+                          "This will use 1 of your $cheatTotal monthly cheat days for today.",
+                      action: () => ref
+                          .read(freezeProvider.notifier)
+                          .activateCheatDay(),
+                    ),
           ),
           const SizedBox(height: 24),
 
@@ -81,7 +174,7 @@ class FreezeDaysScreen extends ConsumerWidget {
                   emoji: '❄️',
                   title: 'Freeze Day',
                   description:
-                      'Applied automatically when you miss a day. Your streak stays alive but the day is marked frozen.',
+                      'Activate manually to protect today, or it can be applied automatically when you miss a day. Your streak stays alive but the day is marked frozen.',
                   color: AppColors.welfareBlue,
                 ),
                 const SizedBox(height: 12),
@@ -164,6 +257,9 @@ class _UsageCard extends StatelessWidget {
     required this.used,
     required this.total,
     required this.remaining,
+    required this.buttonLabel,
+    required this.isLoading,
+    required this.onActivate,
   });
 
   final String emoji;
@@ -173,6 +269,9 @@ class _UsageCard extends StatelessWidget {
   final int used;
   final int total;
   final int remaining;
+  final String buttonLabel;
+  final bool isLoading;
+  final Future<void> Function()? onActivate;
 
   @override
   Widget build(BuildContext context) {
@@ -260,6 +359,38 @@ class _UsageCard extends StatelessWidget {
             '$used of $total used this month',
             style: const TextStyle(
                 fontSize: 12, color: AppColors.darkTextSecondary),
+          ),
+          const SizedBox(height: 16),
+          // ── Activate button ──────────────────────────────────
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton(
+              onPressed: (onActivate == null || isLoading)
+                  ? null
+                  : () => onActivate!(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color,
+                disabledBackgroundColor: color.withOpacity(0.25),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(
+                      remaining <= 0 ? 'None remaining' : buttonLabel,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white),
+                    ),
+            ),
           ),
         ],
       ),
