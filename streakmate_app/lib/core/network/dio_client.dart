@@ -46,7 +46,7 @@ class DioClient {
   Dio get dio => _dio;
 
   static String _resolveBaseUrl() {
-    const fromDefine = String.fromEnvironment('API_BASE_URL', defaultValue: '');
+    const fromDefine = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:5000/api/v1');
     if (fromDefine.isNotEmpty) return fromDefine;
     // TODO(you): if using flutter_dotenv, replace the line below with:
     //   return dotenv.env['API_BASE_URL'] ?? AppConstants.apiBaseUrlFallback;
