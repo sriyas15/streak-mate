@@ -1,3 +1,4 @@
+import { deleteCache, CACHE_KEYS } from '../config/redis.js'
 import { HabitLog, Habit, Subtask, DayLog } from '../models/index.js'
 import { getTodayDate } from '../utils/dateHelper.js'
 import { streakService } from './streak.service.js'
@@ -112,11 +113,6 @@ export const habitLogService = {
       await gamificationService.awardXP(userId, 10, `subtask_complete:${subtaskId}`)
     }
 
-    if (isCompleted && !wasCompleted) {
-  console.log(`💰 Awarding XP to ${userId} for subtask ${subtaskId}`)
-  await gamificationService.awardXP(userId, 10, `subtask_complete:${subtaskId}`)
-}
-
     // If just completed — trigger streak update + achievement check
     if (isComplete) {
       await streakService.handleHabitComplete(userId, habitId, date)
@@ -124,6 +120,9 @@ export const habitLogService = {
       await enqueueAchievementCheck(userId, 'habit_complete')
       emitToUser(userId, SOCKET_EVENTS.HABIT_COMPLETED, { habitId, date })
     }
+
+    const month = date.substring(0, 7)
+    await deleteCache(CACHE_KEYS.calendarMonth(userId, month))
 
     return log
   },
@@ -162,6 +161,9 @@ export const habitLogService = {
     await enqueueAchievementCheck(userId, 'habit_complete')
     emitToUser(userId, SOCKET_EVENTS.HABIT_COMPLETED, { habitId, date })
 
+    const month = date.substring(0, 7)
+    await deleteCache(CACHE_KEYS.calendarMonth(userId, month))
+
     return log
   },
 
@@ -176,6 +178,9 @@ export const habitLogService = {
 
     await streakService.handleHabitUncomplete(userId, habitId, date)
     await dayLogService.recalculate(userId, date)
+
+    const month = date.substring(0, 7)
+    await deleteCache(CACHE_KEYS.calendarMonth(userId, month))
 
     return log
   },

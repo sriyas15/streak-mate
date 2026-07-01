@@ -194,6 +194,15 @@ export const dayLogService = {
       { upsert: true, new: true }
     )
 
+    // After findOneAndUpdate in recalculate:
+    emitToUser(userId, SOCKET_EVENTS.CALENDAR_UPDATED, {
+      date,
+      status: isFreezeDay ? 'freeze' : isCheatDay ? 'cheat' : isProductiveDay ? 'completed' : productivityScore > 0 ? 'partial' : 'missed',
+      productivityScore,
+      completedHabits,
+      totalHabits,
+    })
+
     // If it just became a productive day — update streak
     if (isProductiveDay) {
       await streakService.handleProductiveDay(userId, date)
