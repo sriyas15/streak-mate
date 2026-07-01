@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/network/api_exception.dart';
 import '../models/remote/habit_log_model.dart';
+import '../models/remote/calendar_model.dart';
 import '../repositories/home_repository.dart';
+import 'calendar_provider.dart';
 
 /// home_provider.dart
 /// Drives the Home screen. Manages:
@@ -10,6 +12,7 @@ import '../repositories/home_repository.dart';
 ///  - Creating logs on first tap (POST /habits/:id/logs)
 ///  - Toggling subtask completion (PATCH .../subtasks/:subtaskId)
 ///  - Optimistic UI updates so the screen feels instant
+///  - Checking if yesterday was missed → prompts freeze/cheat day
 
 enum HomeStatus { initial, loading, loaded, error }
 
@@ -19,12 +22,15 @@ class HomeState {
   final String? errorMessage;
   // habitId → true while an API call is in-flight for that habit
   final Set<String> loadingHabitIds;
+  // non-null ("YYYY-MM-DD") if yesterday was missed and needs a prompt
+  final String? missedYesterdayDate;
 
   const HomeState({
     this.status = HomeStatus.initial,
     this.habits = const [],
     this.errorMessage,
     this.loadingHabitIds = const {},
+    this.missedYesterdayDate,
   });
 
   HomeState copyWith({
@@ -32,12 +38,17 @@ class HomeState {
     List<TodayHabitModel>? habits,
     String? errorMessage,
     Set<String>? loadingHabitIds,
+    String? missedYesterdayDate,
+    bool clearMissedYesterday = false,
   }) {
     return HomeState(
       status: status ?? this.status,
       habits: habits ?? this.habits,
       errorMessage: errorMessage,
       loadingHabitIds: loadingHabitIds ?? this.loadingHabitIds,
+      missedYesterdayDate: clearMissedYesterday
+          ? null
+          : (missedYesterdayDate ?? this.missedYesterdayDate),
     );
   }
 
@@ -50,14 +61,17 @@ class HomeState {
 }
 
 class HomeNotifier extends StateNotifier<HomeState> {
-  HomeNotifier(this._repository) : super(const HomeState());
+  HomeNotifier(this._repository, this._ref) : super(const HomeState());
+
   final HomeRepository _repository;
+  final Ref _ref;
 
   Future<void> loadToday() async {
     state = state.copyWith(status: HomeStatus.loading, errorMessage: null);
     try {
       final habits = await _repository.getTodayHabits();
       state = state.copyWith(status: HomeStatus.loaded, habits: habits);
+      await _checkYesterday();
     } on ApiException catch (e) {
       debugPrint('[Home] loadToday failed: ${e.message}');
       state = state.copyWith(status: HomeStatus.error, errorMessage: e.message);
@@ -110,6 +124,34 @@ class HomeNotifier extends StateNotifier<HomeState> {
 
   void clearError() => state = state.copyWith(errorMessage: null);
 
+  // ── Yesterday-missed check ──────────────────────────────────────
+  Future<void> _checkYesterday() async {
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final dateStr =
+        '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
+
+    final calNotifier = _ref.read(calendarProvider.notifier);
+    var calState = _ref.read(calendarProvider);
+
+    // Ensure the month containing yesterday is loaded
+    final yesterdayMonth =
+        '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}';
+    if (calState.month == null || calState.currentMonth != yesterdayMonth) {
+      await calNotifier.loadMonth(yesterdayMonth);
+      calState = _ref.read(calendarProvider);
+    }
+
+    final dayData = calState.month?.days[dateStr];
+
+    if (dayData != null && dayData.status == DayStatus.missed) {
+      state = state.copyWith(missedYesterdayDate: dateStr);
+    }
+  }
+
+  void dismissMissedYesterdayPrompt() {
+    state = state.copyWith(clearMissedYesterday: true);
+  }
+
   // ── Private helpers ─────────────────────────────────────────────
 
   void _optimisticallyToggleSubtask(
@@ -147,5 +189,5 @@ final homeRepositoryProvider =
     Provider<HomeRepository>((ref) => HomeRepository());
 
 final homeProvider = StateNotifierProvider<HomeNotifier, HomeState>((ref) {
-  return HomeNotifier(ref.watch(homeRepositoryProvider));
+  return HomeNotifier(ref.watch(homeRepositoryProvider), ref);
 });

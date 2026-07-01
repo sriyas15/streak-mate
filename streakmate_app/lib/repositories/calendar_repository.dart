@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../core/network/dio_client.dart';
 import '../core/network/api_exception.dart';
 import '../models/remote/calendar_model.dart';
@@ -15,6 +16,15 @@ class CalendarRepository {
         queryParameters: {'month': month},
       );
       _check(r);
+      // DEBUG — remove after fixing
+      final rawDays = r.data['data']['calendar']['days'] as Map<String, dynamic>?;
+      debugPrint('[CalendarRepo] raw days count: ${rawDays?.length}');
+      if (rawDays != null && rawDays.isNotEmpty) {
+        final sample = rawDays.entries.take(3);
+        for (final e in sample) {
+          debugPrint('[CalendarRepo] date=${e.key} raw=${e.value}');
+        }
+      }
       return CalendarMonth.fromJson(
           r.data['data']['calendar'] as Map<String, dynamic>);
     } on DioException catch (e) {

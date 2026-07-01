@@ -14,6 +14,7 @@ import '../../profile/screens/profile_screen.dart';
 import '../../../shared/widgets/custom_avatar.dart'; 
 import '../../calendar/screens/calendar_screen.dart';
 import '../../habits/screens/add_habit_screen.dart';
+import '../../../providers/freeze_provider.dart';
 
 // The exact glowing orange color from the Home UI progress and highlights
 const Color _uiOrange = Color(0xFFE5C07A);
@@ -100,6 +101,13 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
         );
         ref.read(homeProvider.notifier).clearError();
       }
+      if (next.missedYesterdayDate != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          _showMissedYesterdayDialog(context, ref, next.missedYesterdayDate!);
+        }
+      });
+    }
     });
 
     final firstName = user?.name.split(' ').first ?? 'Riyan';
@@ -259,6 +267,51 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
       ),
     );
   }
+}
+
+void _showMissedYesterdayDialog(
+    BuildContext context, WidgetRef ref, String date) {
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: AppColors.darkSurface,
+      title: const Text('You missed yesterday',
+          style: TextStyle(color: AppColors.darkTextPrimary)),
+      content: const Text(
+        'Want to protect your streak? Choose freeze or cheat day for yesterday, or dismiss to leave it as missed.',
+        style: TextStyle(color: AppColors.darkTextSecondary),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            ref.read(homeProvider.notifier).dismissMissedYesterdayPrompt();
+          },
+          child: const Text('Dismiss',
+              style: TextStyle(color: AppColors.darkTextSecondary)),
+        ),
+        TextButton(
+          onPressed: () async {
+            Navigator.pop(ctx);
+            await ref.read(freezeProvider.notifier).activateCheatDay(date: date);
+            ref.read(homeProvider.notifier).dismissMissedYesterdayPrompt();
+          },
+          child: const Text('🎭 Cheat Day',
+              style: TextStyle(color: AppColors.prayerPurple)),
+        ),
+        TextButton(
+          onPressed: () async {
+            Navigator.pop(ctx);
+            await ref.read(freezeProvider.notifier).activateFreeze(date: date);
+            ref.read(homeProvider.notifier).dismissMissedYesterdayPrompt();
+          },
+          child: const Text('❄️ Freeze',
+              style: TextStyle(color: AppColors.welfareBlue)),
+        ),
+      ],
+    ),
+  );
 }
 
 /// ─── Unified Top Hero Section ─────────────────────────────────────────────
@@ -471,8 +524,7 @@ class _TodayJourneySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int completedCount =
-        habits.length > 1 ? habits.length - 1 : 0;
+    final int completedCount = habits.where((h) => h.isCompleted).length;
     final double progress =
         habits.isEmpty ? 0 : completedCount / habits.length;
 
@@ -500,7 +552,6 @@ class _TodayJourneySection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // Progress bar
           Container(
             height: 6,
             width: double.infinity,
@@ -528,7 +579,6 @@ class _TodayJourneySection extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // Horizontal habit cards
           SizedBox(
             height: 105,
             child: ListView.builder(
@@ -536,7 +586,7 @@ class _TodayJourneySection extends StatelessWidget {
               itemCount: habits.length,
               itemBuilder: (context, index) {
                 final habit = habits[index];
-                final isDone = index < completedCount;
+                final isDone = habit.isCompleted; // ← real value, not fake index check
 
                 return Container(
                   width: 72,

@@ -56,6 +56,14 @@ class CalendarNotifier extends StateNotifier<CalendarState> {
     state = state.copyWith(loadingMonth: true, error: null, currentMonth: month);
     try {
       final result = await _repo.getMonth(month);
+      // DEBUG — remove after fixing
+      debugPrint('[Calendar] month=${result.month} days count=${result.days.length}');
+      if (result.days.isNotEmpty) {
+        final sample = result.days.entries.take(5);
+        for (final e in sample) {
+          debugPrint('[Calendar] date=${e.key} status=${e.value.status} completed=${e.value.completedHabits}/${e.value.totalHabits} score=${e.value.productivityScore}');
+        }
+      }
       state = state.copyWith(loadingMonth: false, month: result);
     } on ApiException catch (e) {
       debugPrint('[Calendar] loadMonth error: ${e.message}');
@@ -71,6 +79,18 @@ class CalendarNotifier extends StateNotifier<CalendarState> {
     } on ApiException catch (e) {
       debugPrint('[Calendar] loadDay error: ${e.message}');
       state = state.copyWith(loadingDay: false, error: e.message);
+    }
+  }
+
+  void handleSocketUpdate(dynamic data) {
+    final date = data['date'] as String?;
+    if (date == null) return;
+
+    final month = date.substring(0, 7);
+
+    // If this month is currently displayed, reload it
+    if (state.currentMonth == month) {
+      loadMonth(month);
     }
   }
 
