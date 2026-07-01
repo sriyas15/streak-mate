@@ -197,7 +197,7 @@ export const dayLogService = {
     // After findOneAndUpdate in recalculate:
     emitToUser(userId, SOCKET_EVENTS.CALENDAR_UPDATED, {
       date,
-      status: isFreezeDay ? 'freeze' : isCheatDay ? 'cheat' : isProductiveDay ? 'completed' : productivityScore > 0 ? 'partial' : 'missed',
+      status: dayLog.isFreezeDay ? 'freeze' : dayLog.isCheatDay ? 'cheat' : isProductiveDay ? 'completed' : productivityScore > 0 ? 'partial' : 'missed',
       productivityScore,
       completedHabits,
       totalHabits,
