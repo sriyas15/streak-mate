@@ -24,6 +24,9 @@ export const SOCKET_EVENTS = {
   // ─── Leaderboard ──────────────────────────────────────────────
   LEADERBOARD_UPDATED:      'leaderboard:updated',
 
+  // ─── Calendar ──────────────────────────────────────────────
+  CALENDAR_UPDATED: 'calendar:updated',
+
   // ─── Notifications ────────────────────────────────────────────
   NEW_NOTIFICATION:         'notification:new',
 

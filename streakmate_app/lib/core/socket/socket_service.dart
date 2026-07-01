@@ -5,6 +5,7 @@ import '../constants/app_constants.dart';
 import '../storage/secure_storage.dart';
 import 'socket_events.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/calendar_provider.dart';
 
 class SocketService {
   IO.Socket? _socket;
@@ -69,6 +70,12 @@ class SocketService {
           level: data['newLevel'] as int,
         );
   });
+
+  _socket!.on(SocketEvents.calendarUpdated, (data) {
+  debugPrint('[Socket] Calendar updated: $data');
+  _ref?.read(calendarProvider.notifier).handleSocketUpdate(data);
+});
+
 }
 
   void disconnect() {

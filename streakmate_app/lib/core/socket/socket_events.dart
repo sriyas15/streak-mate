@@ -3,5 +3,6 @@ class SocketEvents {
   static const levelUp          = 'gamification:level_up';
   static const habitCompleted   = 'habit:completed';
   static const streakUpdated    = 'streak:updated';
+  static const calendarUpdated = 'calendar:updated';
   static const achievementUnlocked = 'gamification:achievement';
 }
