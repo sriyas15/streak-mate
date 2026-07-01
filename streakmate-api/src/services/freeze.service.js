@@ -1,6 +1,8 @@
 import { User, DayLog } from '../models/index.js'
 import { streakService } from './streak.service.js'
 import { getTodayDate } from '../utils/dateHelper.js'
+import { deleteCache, CACHE_KEYS } from '../config/redis.js'
+
 
 export const freezeService = {
   // ── Get freeze/cheat balance ─────────────────────────────────────
@@ -37,6 +39,14 @@ export const freezeService = {
       }),
     ])
 
+    const month = date.substring(0, 7) // "YYYY-MM" from "YYYY-MM-DD"
+    await deleteCache(CACHE_KEYS.calendarMonth(userId, month))
+
+    emitToUser(userId, SOCKET_EVENTS.CALENDAR_UPDATED, {
+      date,
+      status: 'freeze',
+    })
+
     await streakService.recalculate(userId)
 
     return {
@@ -71,6 +81,13 @@ export const freezeService = {
         $inc: { cheatDaysUsed: 1, cheatDaysRemaining: -1 },
       }),
     ])
+    const month = date.substring(0, 7)
+    await deleteCache(CACHE_KEYS.calendarMonth(userId, month))
+
+    emitToUser(userId, SOCKET_EVENTS.CALENDAR_UPDATED, {
+      date,
+      status: 'cheat', 
+    })
 
     await streakService.recalculate(userId)
 
