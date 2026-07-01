@@ -20,7 +20,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 2, vsync: this);
+    _tab = TabController(length: 3, vsync: this); // 3 Tabs now
     Future.microtask(() => ref.read(friendsProvider.notifier).loadAll());
   }
 
@@ -35,80 +35,23 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
     final state = ref.watch(friendsProvider);
     final myUserId = ref.watch(authProvider).user?.id ?? '';
 
-    ref.listen<FriendsState>(friendsProvider, (_, next) {
-      if (next.error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(next.error!),
-              backgroundColor: AppColors.danger),
-        );
-        ref.read(friendsProvider.notifier).clearMessages();
-      }
-      if (next.successMessage != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(next.successMessage!),
-              backgroundColor: AppColors.success),
-        );
-        ref.read(friendsProvider.notifier).clearMessages();
-      }
-    });
-
     return Scaffold(
       backgroundColor: AppColors.darkBg,
       body: SafeArea(
         child: state.loading
-            ? const Center(
-                child: CircularProgressIndicator(
-                    color: AppColors.flameOrange))
+            ? const Center(child: CircularProgressIndicator(color: AppColors.flameOrange))
             : NestedScrollView(
                 headerSliverBuilder: (context, _) => [
-                  SliverToBoxAdapter(
-                    child: _Header(
-                      requestCount: state.incomingRequests.length,
-                    ),
-                  ),
-                  // ── Friends horizontal scroll row ──────────────
-                  if (state.friends.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: _FriendsRow(
-                        friends: state.friends,
-                        myUserId: myUserId,
-                        onNudge: (id) =>
-                            ref.read(friendsProvider.notifier).nudge(id),
-                      ),
-                    ),
-                  // ── Incoming requests banner ───────────────────
-                  if (state.incomingRequests.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: _RequestsBanner(
-                        requests: state.incomingRequests,
-                        onAccept: (id) => ref
-                            .read(friendsProvider.notifier)
-                            .acceptRequest(id),
-                        onReject: (id) => ref
-                            .read(friendsProvider.notifier)
-                            .rejectRequest(id),
-                      ),
-                    ),
-                  // ── Tab bar ────────────────────────────────────
+                  SliverToBoxAdapter(child: _Header(requestCount: state.incomingRequests.length)),
                   SliverPersistentHeader(
                     pinned: true,
                     delegate: _TabBarDelegate(
                       TabBar(
                         controller: _tab,
-                        indicator: const UnderlineTabIndicator(
-                          borderSide: BorderSide(
-                              color: AppColors.flameOrange, width: 2.5),
-                        ),
+                        indicatorColor: AppColors.flameOrange,
                         labelColor: AppColors.flameOrange,
                         unselectedLabelColor: AppColors.darkTextSecondary,
-                        labelStyle: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600),
-                        tabs: const [
-                          Tab(text: 'Leaderboard'),
-                          Tab(text: 'Discover'),
-                        ],
+                        tabs: const [Tab(text: 'Leaderboard'), Tab(text: 'Friends'), Tab(text: 'Discover')],
                       ),
                     ),
                   ),
@@ -116,29 +59,20 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
                 body: TabBarView(
                   controller: _tab,
                   children: [
-                    // ── Leaderboard tab ──────────────────────────
-                    _LeaderboardTab(
-                      leaderboard: state.leaderboard,
-                      activity: state.activity,
-                      myUserId: myUserId,
-                    ),
-                    // ── Discover tab ─────────────────────────────
+                    _LeaderboardTab(leaderboard: state.leaderboard,activity: state.activity, myUserId: myUserId),
+                    _FriendsLogTab(friends: state.friends, activity: state.activity, onNudge: (id) => ref.read(friendsProvider.notifier).nudge(id)),
                     _DiscoverTab(
                       suggestions: state.suggestions,
                       searchResults: state.searchResults,
                       searchLoading: state.searchLoading,
-                      onSearch: (q) =>
-                          ref.read(friendsProvider.notifier).search(q),
-                      onClearSearch: () =>
-                          ref.read(friendsProvider.notifier).clearSearch(),
-                      onAdd: (id) =>
-                          ref.read(friendsProvider.notifier).sendRequest(id),
+                      onSearch: (q) => ref.read(friendsProvider.notifier).search(q),
+                      onClearSearch: () => ref.read(friendsProvider.notifier).clearSearch(),
+                      onAdd: (id) => ref.read(friendsProvider.notifier).sendRequest(id),
                     ),
                   ],
                 ),
               ),
       ),
-      // ── Invite friends FAB ─────────────────────────────────────
       bottomNavigationBar: _InviteBar(),
     );
   }
@@ -177,6 +111,145 @@ class _Header extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+// ── Leaderboard tab ───────────────────────────────────────────────────────────
+class _LeaderboardTab extends StatelessWidget {
+  const _LeaderboardTab({
+    required this.leaderboard,
+    required this.activity,
+    required this.myUserId,
+  });
+  final List<LeaderboardEntry> leaderboard;
+  final List<FriendActivityItem> activity;
+  final String myUserId;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      children: [
+        // Top 3 — simplified medal rows
+        if (leaderboard.isNotEmpty) ...[
+          const _SectionLabel(label: 'TOP 3'),
+          _Podium(top3: leaderboard.take(3).toList()),
+          const SizedBox(height: 16),
+        ],
+        // Rest of leaderboard — flat list from #4
+        if (leaderboard.length > 3) ...[
+          const _SectionLabel(label: 'RANKINGS'),
+          ...leaderboard.skip(3).map((e) => _LeaderRow(entry: e)),
+          const SizedBox(height: 20),
+        ],
+        // Friend activity feed
+        const _SectionLabel(label: 'FRIEND ACTIVITY'),
+        if (activity.isNotEmpty)
+          ...activity.map((a) => _ActivityTile(item: a))
+        else
+          const _EmptyActivity(),
+      ],
+    );
+  }
+}
+
+// ── Graphical Podium (Top 3) ────────────────────────────────────────────────
+class _Podium extends StatelessWidget {
+  const _Podium({required this.top3});
+  final List<LeaderboardEntry> top3;
+
+  @override
+  Widget build(BuildContext context) {
+    if (top3.isEmpty) return const SizedBox.shrink();
+    
+    // Order: 2nd, 1st, 3rd (Center is 1st)
+    final sorted = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(sorted.length, (i) {
+          final rank = (i == 1) ? 1 : (i == 0 ? 2 : 3);
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: _PodiumCard(entry: sorted[i], rank: rank),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _PodiumCard extends StatelessWidget {
+
+  final LeaderboardEntry entry;
+  final int rank; // 1 = Gold, 2 = Silver, 3 = Bronze
+  const _PodiumCard({required this.entry, required this.rank});
+
+  @override
+  Widget build(BuildContext context) {
+    final isGold = rank == 1;
+    final isSilver = rank == 2;
+    final isBronze = rank == 3;
+
+    // Define colors based on rank
+    final gradientColors = isGold
+        ? [const Color(0xFFFFD700).withOpacity(0.2), const Color(0xFFB8860B).withOpacity(0.1)]
+        : isSilver
+            ? [const Color(0xFFE0E0E0).withOpacity(0.1), const Color(0xFFA0A0A0).withOpacity(0.05)]
+            : [const Color(0xFFCD7F32).withOpacity(0.1), const Color(0xFF8B4513).withOpacity(0.05)];
+
+    final borderColor = isGold ? const Color(0xFFFFD700) : (isSilver ? const Color(0xFFC0C0C0) : const Color(0xFFCD7F32));
+
+    return Container(
+      width: 110,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: gradientColors),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor.withOpacity(0.6), width: 2),
+      ),
+      child: Column(
+        children: [
+          Text(isGold ? '🥇' : (isSilver ? '🥈' : '🥉'), style: const TextStyle(fontSize: 18)),
+          const SizedBox(height: 8),
+          _MiniAvatar(name: entry.name, color: AppColors.flameOrange, picture: entry.profilePicture, size: 40),
+          const SizedBox(height: 8),
+          Text(entry.name.split(' ').first, 
+               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+          Text('🔥 ${entry.currentStreak}', 
+               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.flameOrange)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Friends Log Tab ──────────────────────────────────────────────────────────
+class _FriendsLogTab extends StatelessWidget {
+  final List<FriendModel> friends;
+  final List<FriendActivityItem> activity;
+  final ValueChanged<String> onNudge;
+  const _FriendsLogTab({required this.friends, required this.activity, required this.onNudge});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text('My Friends', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        ...friends.map((f) => ListTile(
+          leading: _MiniAvatar(name: f.name, color: AppColors.welfareBlue),
+          title: Text(f.name, style: const TextStyle(color: Colors.white)),
+          subtitle: Text('Streak: ${f.currentStreakDays}'),
+        )),
+        const Divider(color: AppColors.darkBorder),
+        // const Text('Activity Logs', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        // ...activity.map((a) => _ActivityTile(item: a)),
+      ],
     );
   }
 }
@@ -375,145 +448,6 @@ class _RequestsBanner extends StatelessWidget {
               )),
         ],
       ),
-    );
-  }
-}
-
-// ── Leaderboard tab ───────────────────────────────────────────────────────────
-class _LeaderboardTab extends StatelessWidget {
-  const _LeaderboardTab({
-    required this.leaderboard,
-    required this.activity,
-    required this.myUserId,
-  });
-  final List<LeaderboardEntry> leaderboard;
-  final List<FriendActivityItem> activity;
-  final String myUserId;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      children: [
-        // Top 3 — simplified medal rows
-        if (leaderboard.isNotEmpty) ...[
-          const _SectionLabel(label: 'TOP 3'),
-          _Podium(top3: leaderboard.take(3).toList()),
-          const SizedBox(height: 16),
-        ],
-        // Rest of leaderboard — flat list from #4
-        if (leaderboard.length > 3) ...[
-          const _SectionLabel(label: 'RANKINGS'),
-          ...leaderboard.skip(3).map((e) => _LeaderRow(entry: e)),
-          const SizedBox(height: 20),
-        ],
-        // Friend activity feed
-        const _SectionLabel(label: 'FRIEND ACTIVITY'),
-        if (activity.isNotEmpty)
-          ...activity.map((a) => _ActivityTile(item: a))
-        else
-          const _EmptyActivity(),
-      ],
-    );
-  }
-}
-
-class _Podium extends StatelessWidget {
-  const _Podium({required this.top3});
-  final List<LeaderboardEntry> top3;
-
-  @override
-  Widget build(BuildContext context) {
-    const medals = ['🥇', '🥈', '🥉'];
-    return Column(
-      children: List.generate(top3.length > 3 ? 3 : top3.length, (i) {
-        final entry = top3[i];
-        final isMe = entry.isMe;
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: isMe
-                ? AppColors.flameOrange.withOpacity(0.08)
-                : AppColors.darkSurface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isMe
-                  ? AppColors.flameOrange.withOpacity(0.35)
-                  : AppColors.darkBorder,
-            ),
-          ),
-          child: Row(
-            children: [
-              // Medal
-              SizedBox(
-                width: 32,
-                child: Text(medals[i],
-                    style: const TextStyle(fontSize: 20)),
-              ),
-              // Avatar
-              _MiniAvatar(
-                name: entry.name,
-                color: AppColors.flameOrange,
-                picture: entry.profilePicture,
-              ),
-              const SizedBox(width: 10),
-              // Name + username
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            entry.name,
-                            style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.darkTextPrimary),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (isMe)
-                          Container(
-                            margin: const EdgeInsets.only(left: 6),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: AppColors.flameOrange.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text('You',
-                                style: TextStyle(
-                                    fontSize: 9,
-                                    color: AppColors.flameOrange)),
-                          ),
-                      ],
-                    ),
-                    Text('@${entry.username} · Lv ${entry.level}',
-                        style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.darkTextSecondary)),
-                  ],
-                ),
-              ),
-              // Streak
-              Row(
-                children: [
-                  const Text('🔥', style: TextStyle(fontSize: 13)),
-                  const SizedBox(width: 2),
-                  Text('${entry.currentStreak}',
-                      style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.flameOrange)),
-                ],
-              ),
-            ],
-          ),
-        );
-      }),
     );
   }
 }
