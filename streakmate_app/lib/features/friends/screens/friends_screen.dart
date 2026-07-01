@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../models/remote/friends_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/friends_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class FriendsScreen extends ConsumerStatefulWidget {
   const FriendsScreen({super.key});
@@ -394,143 +395,120 @@ class _LeaderboardTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       children: [
-        // ── Podium (top 3) ──────────────────────────────────────
+        // Top 3 — simplified medal rows
         if (leaderboard.isNotEmpty) ...[
+          const _SectionLabel(label: 'TOP 3'),
           _Podium(top3: leaderboard.take(3).toList()),
           const SizedBox(height: 16),
         ],
-        // ── Rest of leaderboard ──────────────────────────────────
+        // Rest of leaderboard — flat list from #4
         if (leaderboard.length > 3) ...[
           const _SectionLabel(label: 'RANKINGS'),
           ...leaderboard.skip(3).map((e) => _LeaderRow(entry: e)),
           const SizedBox(height: 20),
         ],
-        // ── Friend activity feed ─────────────────────────────────
-        if (activity.isNotEmpty) ...[
-          const _SectionLabel(label: 'FRIEND ACTIVITY'),
-          ...activity.map((a) => _ActivityTile(item: a)),
-        ] else ...[
-          const _SectionLabel(label: 'FRIEND ACTIVITY'),
+        // Friend activity feed
+        const _SectionLabel(label: 'FRIEND ACTIVITY'),
+        if (activity.isNotEmpty)
+          ...activity.map((a) => _ActivityTile(item: a))
+        else
           const _EmptyActivity(),
-        ],
       ],
     );
   }
 }
 
-// ── Podium ───────────────────────────────────────────────────────────────────
 class _Podium extends StatelessWidget {
   const _Podium({required this.top3});
   final List<LeaderboardEntry> top3;
 
   @override
   Widget build(BuildContext context) {
-    // Order: 2nd | 1st | 3rd
-    final slots = [
-      if (top3.length > 1) top3[1] else null,
-      top3[0],
-      if (top3.length > 2) top3[2] else null,
-    ];
-    final heights = [80.0, 110.0, 60.0];
-    final badges = ['🥈', '🥇', '🥉'];
-    final colors = [
-      Colors.grey.shade400,
-      AppColors.xpGold,
-      const Color(0xFFCD7F32),
-    ];
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: List.generate(3, (i) {
-        final entry = slots[i];
-        if (entry == null) return const Expanded(child: SizedBox());
-        return Expanded(
-          child: Column(
+    const medals = ['🥇', '🥈', '🥉'];
+    return Column(
+      children: List.generate(top3.length > 3 ? 3 : top3.length, (i) {
+        final entry = top3[i];
+        final isMe = entry.isMe;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: isMe
+                ? AppColors.flameOrange.withOpacity(0.08)
+                : AppColors.darkSurface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isMe
+                  ? AppColors.flameOrange.withOpacity(0.35)
+                  : AppColors.darkBorder,
+            ),
+          ),
+          child: Row(
             children: [
-              Text(badges[i], style: const TextStyle(fontSize: 20)),
-              const SizedBox(height: 4),
+              // Medal
+              SizedBox(
+                width: 32,
+                child: Text(medals[i],
+                    style: const TextStyle(fontSize: 20)),
+              ),
               // Avatar
-              Container(
-                width: i == 1 ? 56 : 44,
-                height: i == 1 ? 56 : 44,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: colors[i].withOpacity(0.2),
-                  border: Border.all(color: colors[i], width: 2),
-                  boxShadow: i == 1
-                      ? [
-                          BoxShadow(
-                              color: colors[i].withOpacity(0.4),
-                              blurRadius: 12)
-                        ]
-                      : null,
+              _MiniAvatar(
+                name: entry.name,
+                color: AppColors.flameOrange,
+                picture: entry.profilePicture,
+              ),
+              const SizedBox(width: 10),
+              // Name + username
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            entry.name,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.darkTextPrimary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isMe)
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppColors.flameOrange.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text('You',
+                                style: TextStyle(
+                                    fontSize: 9,
+                                    color: AppColors.flameOrange)),
+                          ),
+                      ],
+                    ),
+                    Text('@${entry.username} · Lv ${entry.level}',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.darkTextSecondary)),
+                  ],
                 ),
-                child: entry.profilePicture != null
-                    ? ClipOval(
-                        child: Image.network(entry.profilePicture!,
-                            fit: BoxFit.cover))
-                    : Center(
-                        child: Text(entry.initials,
-                            style: TextStyle(
-                                fontSize: i == 1 ? 18 : 14,
-                                fontWeight: FontWeight.w800,
-                                color: colors[i]))),
               ),
-              const SizedBox(height: 6),
-              Text(
-                entry.name.split(' ').first,
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.darkTextPrimary),
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
+              // Streak
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('🔥', style: TextStyle(fontSize: 11)),
-                  Text(' ${entry.currentStreak}',
-                      style: TextStyle(
-                          fontSize: 11,
+                  const Text('🔥', style: TextStyle(fontSize: 13)),
+                  const SizedBox(width: 2),
+                  Text('${entry.currentStreak}',
+                      style: const TextStyle(
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: colors[i])),
+                          color: AppColors.flameOrange)),
                 ],
-              ),
-              if (entry.isMe) ...[
-                const SizedBox(height: 3),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: AppColors.flameOrange.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text('You',
-                      style: TextStyle(
-                          fontSize: 9,
-                          color: AppColors.flameOrange,
-                          fontWeight: FontWeight.w600)),
-                ),
-              ],
-              const SizedBox(height: 6),
-              // Podium block
-              Container(
-                height: heights[i],
-                decoration: BoxDecoration(
-                  color: colors[i].withOpacity(0.15),
-                  borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(8)),
-                  border: Border.all(
-                      color: colors[i].withOpacity(0.3)),
-                ),
-                child: Center(
-                  child: Text('#${entry.rank}',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: colors[i])),
-                ),
               ),
             ],
           ),
@@ -954,15 +932,10 @@ class _InviteBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
       decoration: BoxDecoration(
         color: AppColors.darkSurface,
-        border:
-            const Border(top: BorderSide(color: AppColors.darkBorder)),
+        border: const Border(top: BorderSide(color: AppColors.darkBorder)),
       ),
       child: GestureDetector(
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Invite feature coming soon!')),
-          );
-        },
+        onTap: () => _shareInvite(context),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
@@ -974,8 +947,7 @@ class _InviteBar extends StatelessWidget {
           child: const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.person_add_rounded,
-                  color: Colors.white, size: 18),
+              Icon(Icons.person_add_rounded, color: Colors.white, size: 18),
               SizedBox(width: 8),
               Text('+ Invite Friends',
                   style: TextStyle(
@@ -986,6 +958,17 @@ class _InviteBar extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  void _shareInvite(BuildContext context) {
+    const appLink = 'https://streakmate.app/invite'; // 🔁 replace with your real link
+
+    Share.share(
+      '🔥 I\'ve been building streaks with StreakMate!\n\n'
+      'Join me and let\'s keep each other accountable.\n\n'
+      'Download the app: $appLink',
+      subject: 'Join me on StreakMate!',
     );
   }
 }
