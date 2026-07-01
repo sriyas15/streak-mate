@@ -1,15 +1,13 @@
 import { Streak, DayLog, HabitLog, User } from '../models/index.js'
 import { getTodayDate, getPreviousDate, daysBetween } from '../utils/dateHelper.js'
-import { deleteCache, CACHE_KEYS, setCache, TTL } from '../config/redis.js'
+import { deleteCache, getCache, CACHE_KEYS, setCache, TTL } from '../config/redis.js'
 import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
 import { enqueueAchievementCheck } from '../config/bullmq.js'
 
 export const streakService = {
   // ── Get overall app streak ───────────────────────────────────────
   getOverallStreak: async (userId) => {
-    const cached = await import('../config/redis.js').then(m =>
-      m.getCache(m.CACHE_KEYS.userStreak(userId))
-    )
+    const cached = await getCache(CACHE_KEYS.userStreak(userId))
     if (cached) return cached
 
     let streak = await Streak.findOne({ userId, habitId: null }).lean()
@@ -23,9 +21,7 @@ export const streakService = {
 
   // ── Get habit streak ─────────────────────────────────────────────
   getHabitStreak: async (userId, habitId) => {
-    const cached = await import('../config/redis.js').then(m =>
-      m.getCache(m.CACHE_KEYS.habitStreak(userId, habitId))
-    )
+    const cached = await getCache(CACHE_KEYS.habitStreak(userId, habitId))
     if (cached) return cached
 
     let streak = await Streak.findOne({ userId, habitId }).lean()
@@ -87,7 +83,6 @@ export const streakService = {
   },
 
   // ── Handle habit completed ───────────────────────────────────────
-  // Called by habitLogService after a habit is marked complete
   handleHabitComplete: async (userId, habitId, date) => {
     let streak = await Streak.findOne({ userId, habitId })
     if (!streak) streak = new Streak({ userId, habitId })
@@ -106,12 +101,10 @@ export const streakService = {
     const continuesStreak = wasYesterdayComplete || yesterdayProtected || streak.currentStreakCount === 0
 
     if (continuesStreak) {
-      // Extend current streak
       if (!streak.currentStreakStart) streak.currentStreakStart = date
       streak.currentStreakEnd = date
       streak.currentStreakCount += 1
     } else {
-      // End old streak, start new one
       if (streak.currentStreakCount > 0) {
         streak.streakHistory.push({
           startDate: streak.currentStreakStart,
@@ -131,14 +124,12 @@ export const streakService = {
     streak.lastCompletedDate = date
     streak.lastUpdated = new Date()
 
-    // Update best streak
     if (streak.currentStreakCount > streak.bestStreakCount) {
       streak.bestStreakCount = streak.currentStreakCount
       streak.bestStreakStart = streak.currentStreakStart
       streak.bestStreakEnd = date
     }
 
-    // Update history ongoing entry
     const lastHistory = streak.streakHistory[streak.streakHistory.length - 1]
     if (lastHistory && lastHistory.endReason === 'ongoing') {
       lastHistory.count = streak.currentStreakCount
@@ -155,7 +146,6 @@ export const streakService = {
     await streak.save()
     await deleteCache(CACHE_KEYS.habitStreak(userId, habitId))
 
-    // Check milestones
     const MILESTONES = [7, 14, 30, 50, 100]
     if (MILESTONES.includes(streak.currentStreakCount)) {
       emitToUser(userId, SOCKET_EVENTS.STREAK_MILESTONE, {
@@ -224,19 +214,41 @@ export const streakService = {
     await streak.save()
 
     // Sync to User document for fast access
-    await User.findByIdAndUpdate(userId, {
-      currentStreakDays: streak.currentStreakCount,
-      bestStreakDays: Math.max(streak.bestStreakCount, streak.currentStreakCount),
-      lastProductiveDate: date,
-    })
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        currentStreakDays: streak.currentStreakCount,
+        bestStreakDays: Math.max(streak.bestStreakCount, streak.currentStreakCount),
+        lastProductiveDate: date,
+      },
+      { new: true }
+    ).select('currentStreakDays bestStreakDays level xpPoints xpToNextLevel').lean()
 
     await deleteCache(CACHE_KEYS.userStreak(userId))
     await deleteCache(CACHE_KEYS.userProfile(userId))
+
+    // ── Real-time: emit streak update to Flutter ──────────────────
+    emitToUser(userId, SOCKET_EVENTS.STREAK_UPDATED, {
+      currentStreakDays: streak.currentStreakCount,
+      bestStreakDays: updatedUser?.bestStreakDays ?? streak.bestStreakCount,
+      date,
+    })
+
+    // Milestone check
+    const MILESTONES = [7, 14, 30, 50, 100, 365]
+    if (MILESTONES.includes(streak.currentStreakCount)) {
+      emitToUser(userId, SOCKET_EVENTS.STREAK_MILESTONE, {
+        days: streak.currentStreakCount,
+        label: getMilestoneLabel(streak.currentStreakCount),
+      })
+      await enqueueAchievementCheck(userId, `streak_${streak.currentStreakCount}`)
+    }
   },
 
   // ── Full recalculate (used after freeze/cheat day) ───────────────
+  // Walks ALL DayLog records and correctly handles gaps (missed days
+  // with no DayLog entry reset the streak to 0)
   recalculate: async (userId) => {
-    // Rebuild overall streak from DayLog history
     const logs = await DayLog.find({ userId })
       .sort({ date: 1 })
       .select('date isProductiveDay isFreezeDay isCheatDay')
@@ -251,6 +263,8 @@ export const streakService = {
       const isGoodDay = log.isProductiveDay || log.isFreezeDay || log.isCheatDay
 
       if (!isGoodDay) {
+        // Bad day in DayLog — reset streak
+        if (currentStreak > bestStreak) bestStreak = currentStreak
         currentStreak = 0
         streakStart = null
         prevDate = null
@@ -260,8 +274,11 @@ export const streakService = {
       if (prevDate) {
         const gap = daysBetween(prevDate, log.date)
         if (gap === 1) {
+          // Consecutive day — extend streak
           currentStreak += 1
         } else {
+          // Gap > 1 day — missed days in between, reset
+          if (currentStreak > bestStreak) bestStreak = currentStreak
           currentStreak = 1
           streakStart = log.date
         }
@@ -274,10 +291,27 @@ export const streakService = {
       prevDate = log.date
     }
 
-    await User.findByIdAndUpdate(userId, {
-      currentStreakDays: currentStreak,
-      bestStreakDays: bestStreak,
-    })
+    // ── Check if streak should be 0 today ────────────────────────
+    // If the last good day was more than 1 day ago (with no DayLog
+    // entries bridging the gap), reset to 0
+    if (prevDate) {
+      const today = getTodayDate()
+      const gapFromLastGoodDay = daysBetween(prevDate, today)
+      if (gapFromLastGoodDay > 1) {
+        // There are unlogged missed days between last good day and today
+        currentStreak = 0
+        streakStart = null
+      }
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        currentStreakDays: currentStreak,
+        bestStreakDays: bestStreak,
+      },
+      { new: true }
+    ).select('currentStreakDays bestStreakDays').lean()
 
     await Streak.findOneAndUpdate(
       { userId, habitId: null },
@@ -292,10 +326,15 @@ export const streakService = {
 
     await deleteCache(CACHE_KEYS.userStreak(userId))
     await deleteCache(CACHE_KEYS.userProfile(userId))
+
+    // ── Real-time: emit updated streak to Flutter ─────────────────
+    emitToUser(userId, SOCKET_EVENTS.STREAK_UPDATED, {
+      currentStreakDays: currentStreak,
+      bestStreakDays: updatedUser?.bestStreakDays ?? bestStreak,
+    })
   },
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 const getMilestoneLabel = (days) => {
   const labels = {
     3: 'Getting Started 🌱',

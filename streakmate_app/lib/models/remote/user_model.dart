@@ -117,6 +117,8 @@ class UserModel {
     int? freezesRemaining,   
     int? cheatDaysUsed,      
     int? cheatDaysRemaining, 
+    int? currentStreakDays,   
+    int? bestStreakDays,
   }) {
     return UserModel(
       id: id,
@@ -129,8 +131,8 @@ class UserModel {
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
       onboardingStep: onboardingStep ?? this.onboardingStep,
       selectedGoal: selectedGoal ?? this.selectedGoal,
-      currentStreakDays: currentStreakDays,
-      bestStreakDays: bestStreakDays,
+      currentStreakDays: currentStreakDays ?? this.currentStreakDays, 
+      bestStreakDays: bestStreakDays ?? this.bestStreakDays, 
       lastProductiveDate: lastProductiveDate,
       level: level ?? this.level,
       xpPoints: xpPoints ?? this.xpPoints,

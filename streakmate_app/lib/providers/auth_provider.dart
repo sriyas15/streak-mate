@@ -144,6 +144,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 
+  void updateStreak({required int currentStreakDays, required int bestStreakDays}) {
+    if (state.user == null) return;
+    state = state.copyWith(
+      user: state.user!.copyWith(
+        currentStreakDays: currentStreakDays,
+        bestStreakDays: bestStreakDays,
+      ),
+    );
+  }
+
   /// Called after a successful profile update so the UI reflects the
   /// new name/bio/username without needing a full /auth/me re-fetch.
   void setUser(UserModel user) {

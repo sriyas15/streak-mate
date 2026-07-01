@@ -76,6 +76,14 @@ class SocketService {
   _ref?.read(calendarProvider.notifier).handleSocketUpdate(data);
 });
 
+ _socket!.on(SocketEvents.streakUpdated, (data) {
+  debugPrint('[Socket] Streak updated: $data');
+  _ref?.read(authProvider.notifier).updateStreak(
+    currentStreakDays: data['currentStreakDays'] as int,
+    bestStreakDays: data['bestStreakDays'] as int,
+  );
+});
+
 }
 
   void disconnect() {
