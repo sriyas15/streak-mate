@@ -53,4 +53,14 @@ class ApiEndpoints {
       '/habits/$habitId/logs/$date/uncomplete';
   static String habitLogSubtask(String habitId, String date, String subtaskId) =>
       '/habits/$habitId/logs/$date/subtasks/$subtaskId';
+
+  // ─── Notifications ──────────────────────────────────────────────────────
+  static const String fcmToken = '/notifications/fcm-token';
+  static const String unreadCount = '/notifications/unread-count';
+  static const String notificationsList = '/notifications';
+  static const String readAll = '/notifications/read-all';
+  static const String clearAll = '/notifications/clear-all';
+
+  static String markNotifRead(String id) => '/notifications/$id/read';
+  static String deleteNotif(String id) => '/notifications/$id';
 }

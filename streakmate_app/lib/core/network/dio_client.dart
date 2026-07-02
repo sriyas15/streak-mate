@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../constants/app_constants.dart';
 import 'auth_interceptor.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// dio_client.dart
 /// Single Dio instance for the whole app, base URL resolved from env.
@@ -53,3 +54,8 @@ class DioClient {
     return AppConstants.apiBaseUrlFallback;
   }
 }
+
+// Add this provider at the bottom of dio_client.dart
+final dioClientProvider = Provider<Dio>((ref) {
+  return DioClient.instance.dio;
+});

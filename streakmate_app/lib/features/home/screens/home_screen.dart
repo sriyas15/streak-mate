@@ -15,6 +15,8 @@ import '../../../shared/widgets/custom_avatar.dart';
 import '../../calendar/screens/calendar_screen.dart';
 import '../../habits/screens/add_habit_screen.dart';
 import '../../../providers/freeze_provider.dart';
+import '../../../shared/widgets/notification_bell.dart';
+import '../../../providers/notification_provider.dart';
 
 // The exact glowing orange color from the Home UI progress and highlights
 const Color _uiOrange = Color(0xFFE5C07A);
@@ -31,7 +33,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
-
   final List<Widget> _tabs = const [
     _HomeTab(),
     JourneyScreen(),
@@ -85,6 +86,7 @@ void initState() {
   super.initState();
   Future.microtask(() async {
     await ref.read(homeProvider.notifier).loadToday();
+    await ref.read(unreadCountProvider.notifier).fetch();
     if (!mounted) return;
     final missed = ref.read(homeProvider).missedYesterdayDate;
     if (missed != null) {
@@ -115,7 +117,7 @@ void initState() {
   }
 });
 
-    final firstName = user?.name.split(' ').first ?? 'Riyan';
+    final firstName = user?.name.split(' ').first ?? 'Riyas';
     final streak = user?.currentStreakDays ?? 28;
 
     return RefreshIndicator(
@@ -413,13 +415,7 @@ class _TopHeroSection extends StatelessWidget {
                           ),
                         ],
                       ),
-                      IconButton(
-                        icon: const Icon(
-                            Icons.notifications_none_rounded,
-                            color: Colors.white,
-                            size: 28),
-                        onPressed: () {},
-                      ),
+                      const NotificationBell(),
                     ],
                   ),
                 ),

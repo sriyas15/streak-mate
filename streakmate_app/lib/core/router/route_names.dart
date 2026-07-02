@@ -18,4 +18,7 @@ class RouteNames {
   static const String profileReminders = '/profile/reminders';
   static const String profileFreeze = '/profile/freeze';
   static const String profileSettings = '/profile/settings';
+  static const String profileInsights = '/profile/insights';
+
+  static const String notifications = '/notifications';
 }

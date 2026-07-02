@@ -11,6 +11,10 @@ dependencies:
     sdk: flutter
   socket_io_client: ^2.0.3+1
   share_plus: ^10.0.0
+  fl_chart: ^0.69.0
+  timeago: ^3.7.0
+  firebase_messaging: ^16.0.0
+  flutter_local_notifications: ^19.4.1
 
   # ── State management ──────────────────────────────────────────────────
   flutter_riverpod: ^2.5.1

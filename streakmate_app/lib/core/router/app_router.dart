@@ -9,7 +9,8 @@ import '../../features/onboarding/screens/goal_selection_screen.dart';
 import '../../features/onboarding/screens/habit_selection_screen.dart';
 import '../../features/onboarding/screens/subtask_setup_screen.dart';
 import '../../features/onboarding/screens/reminder_setup_screen.dart';
-import '../../features/home/screens/home_screen.dart'; 
+import '../../features/home/screens/home_screen.dart';
+import '../../features/notifications/screens/notifications_screen.dart';
 import 'route_names.dart';
 
 /// app_router.dart
@@ -103,6 +104,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.home,
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.notifications,
+        builder: (_, __) => const NotificationsScreen(),
       ),
     ],
   );

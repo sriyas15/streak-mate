@@ -57,4 +57,37 @@ class AppTextStyles {
     fontWeight: FontWeight.w400,
     color: AppColors.darkTextSecondary,
   );
+
+  static const TextStyle h3 = TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.w700,
+    color: AppColors.darkTextPrimary,
+  );
+
+  static const TextStyle labelLg = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    color: AppColors.darkTextPrimary,
+  );
+
+  static const TextStyle labelMd = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+  );
+
+  static const TextStyle bodySm = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    color: AppColors.darkTextSecondary,
+  );
+
+  static const TextStyle bodyMd = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+  );
+
+  static const TextStyle caption = TextStyle(
+    fontSize: 11,
+    color: AppColors.darkTextSecondary,
+  );
 }
