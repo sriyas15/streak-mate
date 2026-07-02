@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "525309064348",
+    "project_id": "streakmate-app",
+    "storage_bucket": "streakmate-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:525309064348:android:e199c7a14d081881bea959",
+        "android_client_info": {
+          "package_name": "com.streakmate_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBIgDHVl6TNPf6dmZlLmzPnr2Yw4wvNhfw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
