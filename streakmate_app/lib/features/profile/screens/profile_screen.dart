@@ -7,6 +7,7 @@ import 'achievements_screen.dart';
 import 'habit_reminders_screen.dart';
 import 'freeze_days_screen.dart';
 import 'settings_screen.dart';
+import 'insights_screen.dart';
 import '../../../shared/widgets/custom_avatar.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -106,6 +107,13 @@ class ProfileScreen extends ConsumerWidget {
                     label: 'Achievements',
                     color: AppColors.xpGold,
                     onTap: () => _push(context, const AchievementsScreen()),
+                  ),
+                  _MenuRow(
+                    icon: Icons.emoji_events_rounded,
+                    emoji: '📈',
+                    label: 'Insights',
+                    color: AppColors.xpGold,
+                    onTap: () => _push(context, const InsightsScreen()),
                   ),
                   _divider(),
                   _MenuRow(
