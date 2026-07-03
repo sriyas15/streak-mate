@@ -15,9 +15,7 @@ const envSchema = z.object({
   API_VERSION: z
     .string()
     .default('v1'),
-  CLIENT_URL: z
-    .string()
-    .url('CLIENT_URL must be a valid URL'),
+  CLIENT_URL: z.string().url().optional(),
 
   // ─── MongoDB ──────────────────────────────────────────────────
   MONGODB_URI: z
@@ -109,9 +107,9 @@ const parsed = envSchema.safeParse(process.env)
 
 if (!parsed.success) {
   console.error('❌ Invalid environment variables:')
-  parsed.error.errors.forEach((err) => {
-    console.error(`${err.path.join('.')} — ${err.message}`)
-  })
+  parsed.error.issues.forEach((issue) => {
+  console.error(`${issue.path.join('.')} — ${issue.message}`)
+})
   process.exit(1) // hard stop — never start with bad config
 }
 
