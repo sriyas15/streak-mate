@@ -17,7 +17,7 @@ import '../../habits/screens/add_habit_screen.dart';
 import '../../../providers/freeze_provider.dart';
 import '../../../shared/widgets/notification_bell.dart';
 import '../../../providers/notification_provider.dart';
-
+import '../../habits/screens/habit_detail_screen.dart';
 // The exact glowing orange color from the Home UI progress and highlights
 const Color _uiOrange = Color(0xFFE5C07A);
 
@@ -739,12 +739,18 @@ class _HabitCardWithSubtasks extends ConsumerWidget {
         subtasks: subtasks,
         isLoading: isLoading,
         initiallyExpanded: initiallyExpanded,
+        onHeaderTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => HabitDetailScreen(habit: habit),
+          ),
+        ),
         onSubtaskToggle: (subtaskId, currentValue) {
           ref.read(homeProvider.notifier).toggleSubtask(
-                habitId: habit.id,
-                subtaskId: subtaskId,
-                currentValue: currentValue,
-              );
+            habitId: habit.id,
+            subtaskId: subtaskId,
+            currentValue: currentValue,
+          );
         },
       ),
     );

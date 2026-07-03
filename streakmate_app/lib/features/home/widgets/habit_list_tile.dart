@@ -16,6 +16,7 @@ class HabitListTile extends StatefulWidget {
     required this.onSubtaskToggle,
     this.isLoading = false,
     this.initiallyExpanded = false,
+    this.onHeaderTap
   });
 
   final TodayHabitModel habit;
@@ -23,6 +24,7 @@ class HabitListTile extends StatefulWidget {
   final void Function(String subtaskId, bool currentValue) onSubtaskToggle;
   final bool isLoading;
   final bool initiallyExpanded;
+  final VoidCallback? onHeaderTap;
 
   @override
   State<HabitListTile> createState() => _HabitListTileState();
@@ -84,7 +86,8 @@ class _HabitListTileState extends State<HabitListTile>
         children: [
           // ── Header ──────────────────────────────────────────────
           InkWell(
-            onTap: _toggle,
+            onTap: widget.onHeaderTap ?? _toggle,  // navigate if provided, else expand
+            onLongPress: widget.onHeaderTap != null ? _toggle : null,
             borderRadius: BorderRadius.circular(18),
             child: Padding(
               padding: const EdgeInsets.all(14),

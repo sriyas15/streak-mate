@@ -8,8 +8,10 @@ import '../models/remote/habit_log_model.dart';
 /// Wraps GET /habits/today, POST /habits/:id/logs,
 /// PATCH .../subtasks/:subtaskId, POST .../complete
 class HomeRepository {
-  HomeRepository({Dio? dio}) : _dio = dio ?? DioClient.instance.dio;
+
   final Dio _dio;
+  Dio get dio => _dio;
+  HomeRepository({Dio? dio}) : _dio = dio ?? DioClient.instance.dio;
 
   /// GET /habits/today
   /// Returns each habit with todayLog embedded (null if no log yet today).
