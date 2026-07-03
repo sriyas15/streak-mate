@@ -1,5 +1,5 @@
 import mongoose from 'mongoose'
-import { env } from './Env.js'
+import { env } from './env.js'
 
 const MONGODB_OPTIONS = {
   maxPoolSize: 10,        // max connections in pool
