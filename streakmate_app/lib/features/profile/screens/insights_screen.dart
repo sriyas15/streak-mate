@@ -17,7 +17,11 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => ref.read(analyticsProvider.notifier).loadAll());
+    debugPrint('[InsightsScreen] initState called');
+    Future.microtask(() {
+      debugPrint('[InsightsScreen] calling loadAll');
+      ref.read(analyticsProvider.notifier).loadAll();
+    });
   }
 
   @override

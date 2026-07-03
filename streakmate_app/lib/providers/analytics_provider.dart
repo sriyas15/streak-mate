@@ -74,32 +74,48 @@ class AnalyticsNotifier extends StateNotifier<AnalyticsState> {
   Future<void> loadAll() async {
     state = state.copyWith(loading: true, error: null);
     try {
-      final periodStr = state.period == AnalyticsPeriod.week ? 'week' : 'month';
+      final periodStr =
+      state.period == AnalyticsPeriod.week ? 'week' : 'month';
       final year = DateTime.now().year;
 
-      // Fetch all in parallel — non-fatal errors handled per-call
+      AnalyticsOverview? overview;
+      WeeklySummary? weeklySummary;
+      List<CategoryPerformance> categories = [];
+      List<AnalyticsInsight> insights = [];
+      List<HeatmapDay> heatmap = [];
+
+      // Run independently — one failure won't block others
       final results = await Future.wait([
-        _repo.getOverview(periodStr),
-        _repo.getWeeklySummary(),
-        _repo.getCategoryPerformance(periodStr),
-        _repo.getInsights(),
-        _repo.getHeatmap(year),
+        _repo.getOverview(periodStr).then<AnalyticsOverview?>((v) => v)
+            .onError((e, _) { debugPrint('[Analytics] overview failed: $e'); return null; }),
+        _repo.getWeeklySummary().then<WeeklySummary?>((v) => v)
+            .onError((e, _) { debugPrint('[Analytics] weeklySummary failed: $e'); return null; }),
+        _repo.getCategoryPerformance(periodStr).then<List<CategoryPerformance>>((v) => v)
+            .onError((e, _) { debugPrint('[Analytics] categories failed: $e'); return []; }),
+        _repo.getInsights().then<List<AnalyticsInsight>>((v) => v)
+            .onError((e, _) { debugPrint('[Analytics] insights failed: $e'); return []; }),
+        _repo.getHeatmap(year).then<List<HeatmapDay>>((v) => v)
+            .onError((e, _) { debugPrint('[Analytics] heatmap failed: $e'); return []; }),
       ]);
+
+      overview = results[0] as AnalyticsOverview?;
+      weeklySummary = results[1] as WeeklySummary?;
+      categories = results[2] as List<CategoryPerformance>;
+      insights = results[3] as List<AnalyticsInsight>;
+      heatmap = results[4] as List<HeatmapDay>;
 
       state = state.copyWith(
         loading: false,
-        overview: results[0] as AnalyticsOverview,
-        weeklySummary: results[1] as WeeklySummary,
-        categories: results[2] as List<CategoryPerformance>,
-        insights: results[3] as List<AnalyticsInsight>,
-        heatmap: results[4] as List<HeatmapDay>,
+        overview: overview,
+        weeklySummary: weeklySummary,
+        categories: categories,
+        insights: insights,
+        heatmap: heatmap,
       );
-    } on ApiException catch (e) {
-      debugPrint('[Analytics] loadAll error: ${e.message}');
-      state = state.copyWith(loading: false, error: e.message);
     } catch (e) {
-      debugPrint('[Analytics] unexpected: $e');
-      state = state.copyWith(loading: false, error: 'Could not load analytics');
+      debugPrint('[Analytics] loadAll unexpected: $e');
+      state = state.copyWith(
+          loading: false, error: 'Could not load analytics');
     }
   }
 
@@ -108,17 +124,25 @@ class AnalyticsNotifier extends StateNotifier<AnalyticsState> {
     state = state.copyWith(period: period, loading: true, error: null);
     try {
       final periodStr = period == AnalyticsPeriod.week ? 'week' : 'month';
-      final results = await Future.wait([
-        _repo.getOverview(periodStr),
-        _repo.getCategoryPerformance(periodStr),
+      AnalyticsOverview? overview;
+      List<CategoryPerformance> categories = [];
+
+      await Future.wait([
+        _repo.getOverview(periodStr).then((v) => overview = v).catchError((e) {
+          debugPrint('[Analytics] setPeriod overview failed: $e');
+        }),
+        _repo.getCategoryPerformance(periodStr).then((v) => categories = v).catchError((e) {
+          debugPrint('[Analytics] setPeriod categories failed: $e');
+        }),
       ]);
+
       state = state.copyWith(
         loading: false,
-        overview: results[0] as AnalyticsOverview,
-        categories: results[1] as List<CategoryPerformance>,
+        overview: overview ?? state.overview,
+        categories: categories.isNotEmpty ? categories : state.categories,
       );
-    } on ApiException catch (e) {
-      state = state.copyWith(loading: false, error: e.message);
+    } catch (e) {
+      state = state.copyWith(loading: false, error: 'Could not update period');
     }
   }
 
@@ -126,8 +150,8 @@ class AnalyticsNotifier extends StateNotifier<AnalyticsState> {
 }
 
 final analyticsRepositoryProvider =
-    Provider<AnalyticsRepository>((ref) => AnalyticsRepository());
+Provider<AnalyticsRepository>((ref) => AnalyticsRepository());
 
 final analyticsProvider =
-    StateNotifierProvider.autoDispose<AnalyticsNotifier, AnalyticsState>(
+StateNotifierProvider.autoDispose<AnalyticsNotifier, AnalyticsState>(
         (ref) => AnalyticsNotifier(ref.watch(analyticsRepositoryProvider)));

@@ -7,12 +7,12 @@ class AnalyticsOverview {
   final int totalDays;
   final int productiveDays;
   final int missedDays;
-  final double consistencyRate; // 0-100
+  final double consistencyRate;
   final int currentStreak;
   final int bestStreak;
   final int totalHabitsCompleted;
   final int totalHabitsScheduled;
-  final double completionRate; // 0-100
+  final double completionRate;
   final List<DailyActivity> dailyActivity;
 
   const AnalyticsOverview({
@@ -35,16 +35,27 @@ class AnalyticsOverview {
         totalDays: json['totalDays'] as int? ?? 0,
         productiveDays: json['productiveDays'] as int? ?? 0,
         missedDays: json['missedDays'] as int? ?? 0,
-        consistencyRate: (json['consistencyRate'] as num?)?.toDouble() ?? 0,
+        // backend sends successRate OR consistencyRate
+        consistencyRate: (json['successRate'] as num?)?.toDouble() ??
+            (json['consistencyRate'] as num?)?.toDouble() ??
+            0,
         currentStreak: json['currentStreak'] as int? ?? 0,
         bestStreak: json['bestStreak'] as int? ?? 0,
-        totalHabitsCompleted: json['totalHabitsCompleted'] as int? ?? 0,
-        totalHabitsScheduled: json['totalHabitsScheduled'] as int? ?? 0,
-        completionRate: (json['completionRate'] as num?)?.toDouble() ?? 0,
+        // backend sends these OR 0
+        totalHabitsCompleted:
+        json['totalHabitsCompleted'] as int? ?? 0,
+        totalHabitsScheduled:
+        json['totalHabitsScheduled'] as int? ?? 0,
+        // backend sends completionRate OR avgProductivityScore
+        completionRate:
+        (json['completionRate'] as num?)?.toDouble() ??
+            (json['avgProductivityScore'] as num?)?.toDouble() ??
+            0,
+        // dailyActivity may not exist in backend response yet
         dailyActivity: (json['dailyActivity'] as List?)
-                ?.map((d) =>
-                    DailyActivity.fromJson(d as Map<String, dynamic>))
-                .toList() ??
+            ?.map((d) =>
+            DailyActivity.fromJson(d as Map<String, dynamic>))
+            .toList() ??
             [],
       );
 }
