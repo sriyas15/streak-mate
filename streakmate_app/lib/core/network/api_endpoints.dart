@@ -43,6 +43,9 @@ class ApiEndpoints {
   static String subtaskById(String habitId, String subtaskId) =>
       '/habits/$habitId/subtasks/$subtaskId';
 
+  // ─── Friends ─────────────────────────────────────────────────────────
+  static const String friendSearch = '/friends/search';
+
   // ─── Habit Logs ─────────────────────────────────────────────────────────
   static String habitLogs(String habitId) => '/habits/$habitId/logs';
   static String habitLogByDate(String habitId, String date) =>
