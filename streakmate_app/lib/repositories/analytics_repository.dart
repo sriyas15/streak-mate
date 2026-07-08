@@ -42,7 +42,7 @@ class AnalyticsRepository {
       _check(r);
       return (r.data['data']['categories'] as List)
           .map((c) =>
-          CategoryPerformance.fromJson(c as Map<String, dynamic>))
+              CategoryPerformance.fromJson(c as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
       throw _map(e);
@@ -56,7 +56,7 @@ class AnalyticsRepository {
       _check(r);
       return (r.data['data']['insights'] as List)
           .map((i) =>
-          AnalyticsInsight.fromJson(i as Map<String, dynamic>))
+              AnalyticsInsight.fromJson(i as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
       throw _map(e);

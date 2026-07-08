@@ -43,19 +43,19 @@ class AnalyticsOverview {
         bestStreak: json['bestStreak'] as int? ?? 0,
         // backend sends these OR 0
         totalHabitsCompleted:
-        json['totalHabitsCompleted'] as int? ?? 0,
+            json['totalHabitsCompleted'] as int? ?? 0,
         totalHabitsScheduled:
-        json['totalHabitsScheduled'] as int? ?? 0,
+            json['totalHabitsScheduled'] as int? ?? 0,
         // backend sends completionRate OR avgProductivityScore
         completionRate:
-        (json['completionRate'] as num?)?.toDouble() ??
+            (json['completionRate'] as num?)?.toDouble() ??
             (json['avgProductivityScore'] as num?)?.toDouble() ??
             0,
         // dailyActivity may not exist in backend response yet
         dailyActivity: (json['dailyActivity'] as List?)
-            ?.map((d) =>
-            DailyActivity.fromJson(d as Map<String, dynamic>))
-            .toList() ??
+                ?.map((d) =>
+                    DailyActivity.fromJson(d as Map<String, dynamic>))
+                .toList() ??
             [],
       );
 }
