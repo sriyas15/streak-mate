@@ -199,7 +199,8 @@ class _HabitListTileState extends State<HabitListTile>
                       isDone: isDone,
                       color: color,
                       isLoading: widget.isLoading,
-                      onTap: () => widget.onSubtaskToggle(subtask.id, isDone),
+                      onTap: isDone ? null : () => widget.onSubtaskToggle(subtask.id, isDone),
+
                     );
                   }),
                 ],
@@ -225,7 +226,7 @@ class _SubtaskRow extends StatelessWidget {
   final bool isDone;
   final Color color;
   final bool isLoading;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

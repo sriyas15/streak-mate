@@ -215,10 +215,13 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
     Future.microtask(() => ref
         .read(habitDetailProvider(widget.habit.id).notifier)
         .init(widget.habit.id, widget.habit));
+    // In _HabitDetailScreenState.initState, after Future.microtask:
+    debugPrint('[HabitDetail] currentStreak=${widget.habit.currentStreak} bestStreak=${widget.habit.bestStreak}');
   }
 
   @override
   Widget build(BuildContext context) {
+
     final homeHabits = ref.watch(homeProvider).habits;
     final updatedHabit = homeHabits.firstWhere(
           (h) => h.id == widget.habit.id,
@@ -331,9 +334,11 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
                       subtask: subtask,
                       isDone: isDone,
                       color: color,
-                      onTap: () => ref
-                          .read(habitDetailProvider(habit.id).notifier)
-                          .toggleSubtask(habit.id, subtask.id, isDone),
+                      onTap: isDone
+                      ? null
+                      : () => ref
+                            .read(habitDetailProvider(habit.id).notifier)
+                            .toggleSubtask(habit.id, subtask.id, isDone),
                     );
                   },
                   childCount: detail.subtasks.length,
@@ -819,7 +824,7 @@ class _SubtaskTile extends StatelessWidget {
   final SubtaskModel subtask;
   final bool isDone;
   final Color color;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
