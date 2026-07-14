@@ -750,6 +750,7 @@ class _HabitCardWithSubtasks extends ConsumerWidget {
             habitId: habit.id,
             subtaskId: subtaskId,
             currentValue: currentValue,
+            totalSubtasks: subtasks.length,
           );
         },
       ),

@@ -75,15 +75,18 @@ class HomeNotifier extends StateNotifier<HomeState> {
     required String habitId,
     required String subtaskId,
     required bool currentValue,
+    required int totalSubtasks,
   }) async {
-    _optimisticallyToggleSubtask(habitId, subtaskId, !currentValue);
+    final existingHabit = state.habits.firstWhere((h) => h.id == habitId);
+    final needsLogCreation = existingHabit.todayLog == null; // capture BEFORE optimistic update
+
+    _optimisticallyToggleSubtask(habitId, subtaskId, !currentValue, totalSubtasks);
 
     final loading = Set<String>.from(state.loadingHabitIds)..add(habitId);
     state = state.copyWith(loadingHabitIds: loading);
 
     try {
-      final habit = state.habits.firstWhere((h) => h.id == habitId);
-      if (habit.todayLog == null) {
+      if (needsLogCreation) {
         final log = await _repository.createLog(habitId);
         _applyLog(habitId, log);
       }
@@ -96,7 +99,7 @@ class HomeNotifier extends StateNotifier<HomeState> {
       _applyLog(habitId, updatedLog);
     } on ApiException catch (e) {
       debugPrint('[Home] toggleSubtask failed: ${e.message}');
-      _optimisticallyToggleSubtask(habitId, subtaskId, currentValue);
+      _optimisticallyToggleSubtask(habitId, subtaskId, currentValue, totalSubtasks);
       state = state.copyWith(errorMessage: e.message);
     } finally {
       final done = Set<String>.from(state.loadingHabitIds)..remove(habitId);
@@ -141,27 +144,52 @@ class HomeNotifier extends StateNotifier<HomeState> {
     state = state.copyWith(clearMissedYesterday: true);
   }
 
-  void _optimisticallyToggleSubtask(
-      String habitId, String subtaskId, bool newValue) {
-    final habits = state.habits.map((h) {
-      if (h.id != habitId || h.todayLog == null) return h;
-      final results = h.todayLog!.subtaskResults.map((r) {
-        if (r.subtaskId != subtaskId) return r;
-        return r.copyWith(isCompleted: newValue);
-      }).toList();
-      final completed = results.where((r) => r.isCompleted).length;
-      final pct = results.isEmpty
-          ? 0
-          : ((completed / results.length) * 100).round();
-      return h.copyWith(
-        todayLog: h.todayLog!.copyWith(
-          subtaskResults: results,
-          completionPercentage: pct,
-        ),
-      );
-    }).toList();
-    state = state.copyWith(habits: habits);
-  }
+ void _optimisticallyToggleSubtask(
+    String habitId, String subtaskId, bool newValue, int totalSubtasks) {
+  final habits = state.habits.map((h) {
+    if (h.id != habitId) return h;
+
+    final existingResults = h.todayLog?.subtaskResults ?? [];
+    final hasResult = existingResults.any((r) => r.subtaskId == subtaskId);
+
+    final results = hasResult
+        ? existingResults.map((r) {
+            if (r.subtaskId != subtaskId) return r;
+            return r.copyWith(isCompleted: newValue);
+          }).toList()
+        : [
+            ...existingResults,
+            SubtaskResult(subtaskId: subtaskId, isCompleted: newValue),
+          ];
+
+    final completed = results.where((r) => r.isCompleted).length;
+    final pct = totalSubtasks == 0
+        ? 0
+        : ((completed / totalSubtasks) * 100).round();
+    final allDone = totalSubtasks > 0 && completed == totalSubtasks;
+
+    final baseLog = h.todayLog ??
+        HabitLogModel(
+          id: '',
+          habitId: habitId,
+          userId: '',
+          date: '',
+          subtaskResults: const [],
+          isCompleted: false,
+          completionPercentage: 0,
+          loggedOffline: false,
+        );
+
+    return h.copyWith(
+      todayLog: baseLog.copyWith(
+        subtaskResults: results,
+        completionPercentage: pct,
+        isCompleted: allDone,
+      ),
+    );
+  }).toList();
+  state = state.copyWith(habits: habits);
+}
 
   void _applyLog(String habitId, HabitLogModel log) {
     final habits = state.habits.map((h) {
