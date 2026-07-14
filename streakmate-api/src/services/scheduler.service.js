@@ -7,8 +7,9 @@ import { streakService } from './streak.service.js'
 import { dayLogService } from './dayLog.service.js'
 import { gamificationService } from './gamification.service.js'
 import { achievementService } from './achievement.service.js'
-import { User, Habit, DayLog } from '../models/index.js'
+import { User, Habit, DayLog, Streak } from '../models/index.js'
 import { getTodayDate } from '../utils/dateHelper.js'
+import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
 
 // ─── Worker factory ──────────────────────────────────────────────────────────
 const createWorker = (queueName, processor) => {
@@ -39,11 +40,10 @@ export const habitReminderWorker = createWorker(
   async (job) => {
     const { userId, habitId, habitName } = job.data
 
-    // Check if habit is already completed today
     const today = getTodayDate()
     const { HabitLog } = await import('../models/index.js')
     const log = await HabitLog.findOne({ userId, habitId, date: today, isCompleted: true })
-    if (log) return // already done — skip
+    if (log) return
 
     await notificationService.sendFromTemplate(userId, 'habit_reminder', {
       habitName,
@@ -60,7 +60,6 @@ export const streakWarningWorker = createWorker(
   async () => {
     const today = getTodayDate()
 
-    // Find users with incomplete habits today who have active streaks
     const usersAtRisk = await User.find({
       isActive: true,
       isDeleted: false,
@@ -96,39 +95,68 @@ export const endOfDayWorker = createWorker(
     const users = await User.find({
       isActive: true,
       isDeleted: false,
-    }).select('_id currentStreakDays').lean()
+    }).select('_id name currentStreakDays bestStreakDays').lean()
 
     for (const user of users) {
-      // Finalise yesterday's daylog
+      // ── Finalise yesterday's daylog ────────────────────────────
+      // DO NOT upsert — only update if a real DayLog exists.
+      // Upserting creates blank docs for users with no activity,
+      // which would incorrectly trigger streak breaks.
       const dayLog = await DayLog.findOneAndUpdate(
         { userId: user._id, date: yesterdayStr, resolvedAt: null },
         { resolvedAt: new Date() },
-        { upsert: true, new: true }
-      )
+        { new: true }
+      ) ?? { isProductiveDay: false, isFreezeDay: false, isCheatDay: false }
 
-      // Award XP for productive day
+      // ── Award XP for productive day ────────────────────────────
       if (dayLog.isProductiveDay) {
         await gamificationService.awardProductiveDay(String(user._id))
         await achievementService.checkAndUnlock(String(user._id), 'streak')
       }
 
-      // Streak broken — notify
+      // ── Streak broken ──────────────────────────────────────────
+      // Only break streak if yesterday was not productive/protected
+      // AND user actually had an active streak
       if (
         !dayLog.isProductiveDay &&
         !dayLog.isFreezeDay &&
         !dayLog.isCheatDay &&
         user.currentStreakDays > 0
       ) {
+        // Notify user
         await notificationService.sendFromTemplate(String(user._id), 'streak_broken', {
           streakCount: String(user.currentStreakDays),
         })
 
-        // Reset streak
-        await User.findByIdAndUpdate(user._id, { currentStreakDays: 0 })
+        // Reset User document streak
+        await User.findByIdAndUpdate(user._id, {
+          currentStreakDays: 0,
+          lastProductiveDate: null,
+        })
+
+        // Reset Streak document so handleProductiveDay doesn't
+        // pick up the old count next time user completes a habit
+        await Streak.findOneAndUpdate(
+          { userId: user._id, habitId: null },
+          {
+            currentStreakCount: 0,
+            currentStreakStart: null,
+            currentStreakEnd: null,
+            lastUpdated: new Date(),
+          }
+        )
+
+        // Real-time: push streak reset to Flutter immediately
+        emitToUser(String(user._id), SOCKET_EVENTS.STREAK_UPDATED, {
+          currentStreakDays: 0,
+          bestStreakDays: user.bestStreakDays ?? 0,
+        })
+
+        console.log(`🔥 Streak broken for user ${user._id} (was ${user.currentStreakDays} days)`)
       }
     }
 
-    // Reset monthly freeze allowances on 1st of month
+    // ── Reset monthly freeze allowances on 1st of month ──────────
     const today = getTodayDate()
     if (today.endsWith('-01')) {
       await freezeService.resetMonthlyAllowances()
@@ -188,7 +216,6 @@ export const funnyNotifWorker = createWorker(
   async () => {
     const today = getTodayDate()
 
-    // Target: users who haven't opened the app or completed anything today
     const activeToday = await DayLog.find({
       date: today,
       completedHabits: { $gt: 0 },
@@ -214,7 +241,6 @@ export const funnyNotifWorker = createWorker(
 /**
  * Push Notification Delivery Worker
  * Final delivery queue — actually sends FCM
- * Job data: { userId, type, title, body, data, habitId }
  */
 export const pushNotificationWorker = createWorker(
   QUEUE_NAMES.PUSH_NOTIFICATION,
@@ -227,7 +253,6 @@ export const pushNotificationWorker = createWorker(
 /**
  * Achievement Check Worker
  * Triggered after habit complete / streak milestone
- * Job data: { userId, trigger }
  */
 export const achievementCheckWorker = createWorker(
   QUEUE_NAMES.ACHIEVEMENT_CHECK,
