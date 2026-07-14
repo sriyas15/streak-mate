@@ -18,6 +18,8 @@ import '../../../providers/freeze_provider.dart';
 import '../../../shared/widgets/notification_bell.dart';
 import '../../../providers/notification_provider.dart';
 import '../../habits/screens/habit_detail_screen.dart';
+import '../../../shared/widgets/habit_completion_dialog.dart';
+
 // The exact glowing orange color from the Home UI progress and highlights
 const Color _uiOrange = Color(0xFFE5C07A);
 
@@ -95,25 +97,48 @@ void initState() {
   });
 }
 
-  @override
-  Widget build(BuildContext context) {
-    final homeState = ref.watch(homeProvider);
-    final user = ref.watch(authProvider).user;
+@override
+Widget build(BuildContext context) {
+  final homeState = ref.watch(homeProvider);
+  final user = ref.watch(authProvider).user;
 
-    ref.listen<HomeState>(homeProvider, (previous, next) {
-  if (next.errorMessage != null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(next.errorMessage!), backgroundColor: AppColors.danger),
-    );
-    ref.read(homeProvider.notifier).clearError();
-  }
+  ref.listen<HomeState>(homeProvider, (previous, next) {
+    if (next.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(next.errorMessage!), backgroundColor: AppColors.danger),
+      );
+      ref.read(homeProvider.notifier).clearError();
+    }
 
-  if (previous?.missedYesterdayDate == null && next.missedYesterdayDate != null) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) {
-        _showMissedYesterdayDialog(context, ref, next.missedYesterdayDate!);
+    if (previous?.missedYesterdayDate == null && next.missedYesterdayDate != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          _showMissedYesterdayDialog(context, ref, next.missedYesterdayDate!);
+        }
+      });
+    }
+
+    if (previous != null) {
+    for (final habit in next.habits) {
+      final prev = previous.habits.firstWhere(
+        (h) => h.id == habit.id,
+        orElse: () => habit,
+      );
+      if (!prev.isCompleted && habit.isCompleted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) {
+            showHabitCompletionDialog(
+              context,
+              ref,
+              habitName: habit.name,
+              habitIcon: habit.icon,
+              habitColor: habit.color,
+            );
+          }
+        });
+        break; // show only one dialog at a time
       }
-    });
+    }
   }
 });
 

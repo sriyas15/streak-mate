@@ -9,6 +9,7 @@ import '../../../models/remote/subtask_model.dart';
 import '../../../providers/home_provider.dart';
 import '../../../repositories/home_repository.dart';
 import '../../../repositories/subtask_repository.dart';
+import '../../../shared/widgets/habit_completion_dialog.dart';
 
 // ─── Week Log Repository ──────────────────────────────────────────────────────
 
@@ -231,7 +232,7 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
     final color = Color(int.parse(habit.color.replaceFirst('#', '0xFF')));
     final detail = ref.watch(habitDetailProvider(habit.id));
 
-    ref.listen<HabitDetailState>(habitDetailProvider(habit.id), (_, next) {
+    ref.listen<HabitDetailState>(habitDetailProvider(habit.id), (previous, next) {
       if (next.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -239,6 +240,20 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
               backgroundColor: AppColors.danger),
         );
         ref.read(habitDetailProvider(habit.id).notifier).clearError();
+      }
+      // Completion celebration
+      if (previous != null && !previous.isCompleted && next.isCompleted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) {
+            showHabitCompletionDialog(
+              context,
+              ref,
+              habitName: habit.name,
+              habitIcon: habit.icon,
+              habitColor: habit.color,
+            );
+          }
+        });
       }
     });
 
