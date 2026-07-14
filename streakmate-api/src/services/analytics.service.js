@@ -9,9 +9,10 @@ export const analyticsService = {
     if (cached) return cached
 
     const { from, to } = getRangeByPeriod(period)
-    const [dayLogs, user] = await Promise.all([
+    const [dayLogs, user, habitLogs] = await Promise.all([
       DayLog.find({ userId, date: { $gte: from, $lte: to } }).lean(),
       User.findById(userId).select('currentStreakDays bestStreakDays level xpPoints').lean(),
+      HabitLog.find({ userId, date: { $gte: from, $lte: to } }).lean(),
     ])
 
     const totalDays = dayLogs.length
@@ -37,6 +38,8 @@ export const analyticsService = {
       bestStreak: user.bestStreakDays,
       level: user.level,
       xpPoints: user.xpPoints,
+      totalHabitsCompleted: habitLogs.filter((l) => l.isCompleted).length,
+      totalHabitsScheduled: habitLogs.length,
     }
 
     await setCache(CACHE_KEYS.analytics(userId, period), overview, TTL.LONG)

@@ -111,7 +111,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   const SizedBox(height: 20),
 
                   // ── Consistency gauge + stat cards ────────────
-                  _ConsistencyRow(overview: state.overview, user: user),
+                  _ConsistencyRow(overview: state.overview),
                   const SizedBox(height: 20),
 
                   // ── Line chart from calendar data ─────────────
@@ -235,14 +235,13 @@ class _MotivationalHeading extends StatelessWidget {
 
 // ── Consistency gauge + stat cards ────────────────────────────────────────────
 class _ConsistencyRow extends StatelessWidget {
-  const _ConsistencyRow({required this.overview, required this.user});
+  const _ConsistencyRow({required this.overview});
   final AnalyticsOverview? overview;
-  final dynamic user;
 
   @override
   Widget build(BuildContext context) {
     final rate = overview?.consistencyRate ?? 0;
-    final streak = user?.currentStreakDays ?? 0;
+    final streak = overview?.bestStreak ?? 0;
     final completed = overview?.totalHabitsCompleted ?? 0;
 
     return Row(
