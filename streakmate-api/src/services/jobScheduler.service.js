@@ -1,6 +1,8 @@
 import { Queue } from 'bullmq'
 import { redis } from '../config/redis.js'
 import { QUEUE_NAMES } from '../config/bullmq.js'
+import { Streak } from '../models/index.js'
+import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
 
 // One Queue instance per queue name — used only to schedule jobs.
 // The actual processing logic lives in scheduler.service.js workers,
@@ -51,3 +53,5 @@ export const registerScheduledJobs = async () => {
 
   console.log('🕒 Scheduled jobs registered')
 }
+// in jobScheduler.service.js — add this export
+export const endOfDayQueue = getQueue(QUEUE_NAMES.END_OF_DAY)

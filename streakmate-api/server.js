@@ -3,6 +3,8 @@ import {connectDB} from './src/config/db.js'
 import { env } from './src/config/env.js'
 import { initSocket } from './src/socket/index.js'
 import {registerScheduledJobs} from './src/services/jobScheduler.service.js'
+import { endOfDayQueue } from './src/services/jobScheduler.service.js'
+import './src/services/scheduler.service.js'
 import dns from 'dns';
 dns.setServers(['8.8.8.8', '1.1.1.1']);
 
@@ -20,6 +22,7 @@ const startServer = async () => {
       host: '0.0.0.0',
     })
     await registerScheduledJobs()
+    await endOfDayQueue.add('manual-test', {})
 
     initSocket(app.server)
 
