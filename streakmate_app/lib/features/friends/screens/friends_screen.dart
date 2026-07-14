@@ -659,8 +659,7 @@ class _DiscoverTabState extends ConsumerState<_DiscoverTab> {
 
   @override
   Widget build(BuildContext context) {
-    final showSearchResults =
-        _isSearching && _searchCtrl.text.trim().length >= 2;
+    final showSearchResults = _searchCtrl.text.trim().length >= 2;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -723,14 +722,23 @@ class _DiscoverTabState extends ConsumerState<_DiscoverTab> {
                   onAdd: () => widget.onAdd(u.id),
                 )),
         ] else ...[
-          const _SectionLabel(label: 'PEOPLE YOU MAY KNOW'),
-          if (widget.suggestions.isEmpty)
-            const _EmptySuggestions()
-          else
-            ...widget.suggestions.map((s) => _SuggestionTile(
-                  friend: s,
-                  onAdd: () => widget.onAdd(s.id),
-                )),
+          const SizedBox(height: 40),
+          const Center(
+            child: Column(
+              children: [
+                Text('🔍', style: TextStyle(fontSize: 40)),
+                SizedBox(height: 12),
+                Text(
+                  'Search by username to find friends',
+                  style: TextStyle(
+                    color: AppColors.darkTextSecondary,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
         ],
       ],
     );

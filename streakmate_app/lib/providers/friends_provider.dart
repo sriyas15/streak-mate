@@ -4,6 +4,8 @@ import '../core/network/api_exception.dart';
 import '../models/remote/friends_model.dart';
 import '../repositories/friends_repository.dart';
 import '../repositories/leaderboard_repository.dart';
+import '../core/network/dio_client.dart';
+import '../core/network/api_endpoints.dart';
 
 class FriendsState {
   final List<FriendModel> friends;
@@ -57,11 +59,12 @@ class FriendsState {
 }
 
 class FriendsNotifier extends StateNotifier<FriendsState> {
-  FriendsNotifier(this._friends, this._leaderboard)
+  FriendsNotifier(this._friends, this._leaderboard,this.ref)
       : super(const FriendsState());
 
   final FriendsRepository _friends;
   final LeaderboardRepository _leaderboard;
+  final Ref ref;
 
   Future<void> loadAll() async {
     state = state.copyWith(loading: true, error: null);
@@ -69,7 +72,6 @@ class FriendsNotifier extends StateNotifier<FriendsState> {
       final results = await Future.wait([
         _friends.getFriends(),
         _friends.getIncomingRequests(),
-        _friends.getSuggestions(),
         _leaderboard.getFriendsLeaderboard(),
         _friends.getActivity(),
       ]);
@@ -91,19 +93,39 @@ class FriendsNotifier extends StateNotifier<FriendsState> {
     }
   }
 
+  // Future<void> search(String query) async {
+  //   if (query.trim().length < 2) {
+  //     state = state.copyWith(searchResults: []);
+  //     return;
+  //   }
+  //   state = state.copyWith(searchLoading: true);
+  //   try {
+  //     final results = await _friends.searchUsers(query.trim());
+  //     state = state.copyWith(searchLoading: false, searchResults: results);
+  //   } on ApiException catch (e) {
+  //     state = state.copyWith(searchLoading: false, error: e.message);
+  //   }
+  // }
   Future<void> search(String query) async {
-    if (query.trim().length < 2) {
-      state = state.copyWith(searchResults: []);
-      return;
-    }
-    state = state.copyWith(searchLoading: true);
-    try {
-      final results = await _friends.searchUsers(query.trim());
-      state = state.copyWith(searchLoading: false, searchResults: results);
-    } on ApiException catch (e) {
-      state = state.copyWith(searchLoading: false, error: e.message);
-    }
+  if (query.trim().length < 2) {
+    state = state.copyWith(searchResults: [], searchLoading: false);
+    return; // ← stop here, don't hit the API
   }
+  state = state.copyWith(searchLoading: true);
+  try {
+    final dio = ref.read(dioClientProvider);
+    final res = await dio.get(
+      ApiEndpoints.friendSearch,
+      queryParameters: {'q': query.trim()},
+    );
+    final results = (res.data['data']['users'] as List)
+        .map((u) => FriendModel.fromJson(u))
+        .toList();
+    state = state.copyWith(searchResults: results, searchLoading: false);
+  } catch (_) {
+    state = state.copyWith(searchLoading: false);
+  }
+}
 
   void clearSearch() => state = state.copyWith(searchResults: []);
 
@@ -199,5 +221,6 @@ final friendsProvider =
   return FriendsNotifier(
     ref.watch(friendsRepositoryProvider),
     ref.watch(leaderboardRepositoryProvider),
+    ref
   );
 });

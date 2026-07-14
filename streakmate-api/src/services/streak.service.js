@@ -1,4 +1,4 @@
-import { Streak, DayLog, HabitLog, User } from '../models/index.js'
+import { Streak, DayLog, HabitLog, User, Habit } from '../models/index.js'
 import { getTodayDate, getPreviousDate, daysBetween } from '../utils/dateHelper.js'
 import { deleteCache, getCache, CACHE_KEYS, setCache, TTL } from '../config/redis.js'
 import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
@@ -144,6 +144,13 @@ export const streakService = {
     }
 
     await streak.save()
+
+    // Sync current streak count back to Habit document
+    await Habit.findByIdAndUpdate(habitId, {
+      currentStreak: streak.currentStreakCount,
+      bestStreak: Math.max(streak.bestStreakCount, streak.currentStreakCount),
+    })
+
     await deleteCache(CACHE_KEYS.habitStreak(userId, habitId))
 
     const MILESTONES = [7, 14, 30, 50, 100]
@@ -167,6 +174,9 @@ export const streakService = {
       if (streak.currentStreakCount === 0) streak.currentStreakStart = null
       streak.lastUpdated = new Date()
       await streak.save()
+      await Habit.findByIdAndUpdate(habitId, {
+        currentStreak: streak.currentStreakCount,
+      })
       await deleteCache(CACHE_KEYS.habitStreak(userId, habitId))
     }
   },

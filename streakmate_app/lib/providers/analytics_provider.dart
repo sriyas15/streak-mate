@@ -75,7 +75,7 @@ class AnalyticsNotifier extends StateNotifier<AnalyticsState> {
     state = state.copyWith(loading: true, error: null);
     try {
       final periodStr =
-      state.period == AnalyticsPeriod.week ? 'week' : 'month';
+          state.period == AnalyticsPeriod.week ? 'week' : 'month';
       final year = DateTime.now().year;
 
       AnalyticsOverview? overview;
@@ -150,8 +150,8 @@ class AnalyticsNotifier extends StateNotifier<AnalyticsState> {
 }
 
 final analyticsRepositoryProvider =
-Provider<AnalyticsRepository>((ref) => AnalyticsRepository());
+    Provider<AnalyticsRepository>((ref) => AnalyticsRepository());
 
 final analyticsProvider =
-StateNotifierProvider.autoDispose<AnalyticsNotifier, AnalyticsState>(
+    StateNotifierProvider.autoDispose<AnalyticsNotifier, AnalyticsState>(
         (ref) => AnalyticsNotifier(ref.watch(analyticsRepositoryProvider)));
