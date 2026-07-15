@@ -13,7 +13,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _notificationsEnabled = true;
-  bool _soundEnabled = true;
   bool _loaded = false;
 
   @override
@@ -25,7 +24,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         setState(() {
           _notificationsEnabled = s['notificationsEnabled'] as bool? ?? true;
-          _soundEnabled = s['reminderSoundEnabled'] as bool? ?? true;
           _loaded = true;
         });
       }
@@ -34,8 +32,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _saveSettings() async {
     await ref.read(userProfileProvider.notifier).updateSettings({
-      'notificationsEnabled': _notificationsEnabled,
-      'reminderSoundEnabled': _soundEnabled,
+      'notificationsEnabled': _notificationsEnabled
     });
   }
 
@@ -118,18 +115,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     color: AppColors.flameOrange,
                     onChanged: (v) {
                       setState(() => _notificationsEnabled = v);
-                      _saveSettings();
-                    },
-                  ),
-                  const _Div(),
-                  _ToggleRow(
-                    icon: Icons.volume_up_outlined,
-                    label: 'Reminder sound',
-                    subtitle: 'Play sound with reminders',
-                    value: _soundEnabled,
-                    color: AppColors.prayerPurple,
-                    onChanged: (v) {
-                      setState(() => _soundEnabled = v);
                       _saveSettings();
                     },
                   ),
