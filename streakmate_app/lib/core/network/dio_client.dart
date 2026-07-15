@@ -23,6 +23,17 @@ class DioClient {
       ),
     );
 
+    _dio.interceptors.add(InterceptorsWrapper(
+  onRequest: (options, handler) {
+    if (options.method == 'DELETE') {
+      // Remove content-type for DELETE requests globally
+      options.headers.remove('content-type');
+      options.contentType = null; 
+    }
+    return handler.next(options);
+  },
+));
+
     // ── Debug logging — prints every request + response to Flutter console ──
     // Automatically disabled in release builds via kDebugMode.
     if (kDebugMode) {

@@ -37,6 +37,19 @@ const buildApp = async () => {
     }
   })
 
+  fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    if (!body || body.length === 0) {
+      done(null, {})
+      return
+    }
+    try {
+      done(null, JSON.parse(body))
+    } catch (err) {
+      err.statusCode = 400
+      done(err, undefined)
+    }
+  })
+
   // API routes
   fastify.register(registerRoutes, {
     prefix: `/api/${env.API_VERSION}`,

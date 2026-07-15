@@ -200,7 +200,6 @@ class _HabitListTileState extends State<HabitListTile>
                       color: color,
                       isLoading: widget.isLoading,
                       onTap: isDone ? null : () => widget.onSubtaskToggle(subtask.id, isDone),
-
                     );
                   }),
                 ],
@@ -231,7 +230,7 @@ class _SubtaskRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: isLoading ? null : onTap,
+      onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),

@@ -128,6 +128,25 @@ class HomeRepository {
     }
   }
 
+  /// DELETE /habits/:habitId
+  Future<void> deleteHabit(String habitId) async {
+  try {
+    final r = await _dio.delete(
+      ApiEndpoints.habitById(habitId),
+    );
+    if (r.statusCode != 200) {
+      throw ApiException('Could not delete habit', statusCode: r.statusCode);
+    }
+  } on DioException catch (e) {
+    throw ApiException(
+      e.response?.data?['message'] ?? 'Could not delete habit',
+      statusCode: e.response?.statusCode,
+    );
+  } on ApiException {
+    rethrow;
+  }
+}
+
   String _today() {
     final now = DateTime.now();
     return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';

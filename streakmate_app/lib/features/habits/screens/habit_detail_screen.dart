@@ -9,7 +9,6 @@ import '../../../models/remote/subtask_model.dart';
 import '../../../providers/home_provider.dart';
 import '../../../repositories/home_repository.dart';
 import '../../../repositories/subtask_repository.dart';
-import '../../../shared/widgets/habit_completion_dialog.dart';
 
 // ─── Week Log Repository ──────────────────────────────────────────────────────
 
@@ -19,11 +18,9 @@ class HabitWeekRepository {
 
   Future<Map<String, bool>> getWeekCompletion(String habitId) async {
     final now = DateTime.now();
-    // Current week Mon–Sun
-    final weekday = now.weekday; // Mon=1, Sun=7
+    final weekday = now.weekday;
     final monday = now.subtract(Duration(days: weekday - 1));
     final sunday = monday.add(const Duration(days: 6));
-
     final from = _fmt(monday);
     final to = _fmt(sunday);
 
@@ -55,14 +52,16 @@ class HabitWeekRepository {
 class HabitDetailState {
   final bool loading;
   final bool marking;
+  final bool deleting;
   final HabitLogModel? log;
   final List<SubtaskModel> subtasks;
-  final Map<String, bool> weekCompletion; // "YYYY-MM-DD" → isCompleted
+  final Map<String, bool> weekCompletion;
   final String? error;
 
   const HabitDetailState({
     this.loading = false,
     this.marking = false,
+    this.deleting = false,
     this.log,
     this.subtasks = const [],
     this.weekCompletion = const {},
@@ -72,6 +71,7 @@ class HabitDetailState {
   HabitDetailState copyWith({
     bool? loading,
     bool? marking,
+    bool? deleting,
     HabitLogModel? log,
     List<SubtaskModel>? subtasks,
     Map<String, bool>? weekCompletion,
@@ -80,6 +80,7 @@ class HabitDetailState {
       HabitDetailState(
         loading: loading ?? this.loading,
         marking: marking ?? this.marking,
+        deleting: deleting ?? this.deleting,
         log: log ?? this.log,
         subtasks: subtasks ?? this.subtasks,
         weekCompletion: weekCompletion ?? this.weekCompletion,
@@ -93,12 +94,13 @@ class HabitDetailState {
 }
 
 class HabitDetailNotifier extends StateNotifier<HabitDetailState> {
-  HabitDetailNotifier(this._subtaskRepo, this._homeRepo, this._weekRepo)
+  HabitDetailNotifier(this._subtaskRepo, this._homeRepo, this._weekRepo, this.ref)
       : super(const HabitDetailState());
 
   final SubtaskRepository _subtaskRepo;
   final HomeRepository _homeRepo;
   final HabitWeekRepository _weekRepo;
+  final Ref ref;
 
   Future<void> init(String habitId, TodayHabitModel habit) async {
     state = state.copyWith(loading: true, error: null);
@@ -130,7 +132,6 @@ class HabitDetailNotifier extends StateNotifier<HabitDetailState> {
       }
     }
 
-    // Optimistic update
     final results = state.log!.subtaskResults.map((r) {
       if (r.subtaskId != subtaskId) return r;
       return r.copyWith(isCompleted: !currentValue);
@@ -154,7 +155,6 @@ class HabitDetailNotifier extends StateNotifier<HabitDetailState> {
       );
       state = state.copyWith(log: updated);
     } on ApiException catch (e) {
-      // Rollback
       final rolled = state.log!.subtaskResults.map((r) {
         if (r.subtaskId != subtaskId) return r;
         return r.copyWith(isCompleted: currentValue);
@@ -174,13 +174,25 @@ class HabitDetailNotifier extends StateNotifier<HabitDetailState> {
         state = state.copyWith(log: log);
       }
       final updated = await _homeRepo.markComplete(habitId);
-      // Refresh week completion for today
       final week = await _weekRepo.getWeekCompletion(habitId);
-      state = state.copyWith(
-          marking: false, log: updated, weekCompletion: week);
+      state = state.copyWith(marking: false, log: updated, weekCompletion: week);
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(marking: false, error: e.message);
+      return false;
+    }
+  }
+
+  Future<bool> deleteHabit(String habitId) async {
+    state = state.copyWith(deleting: true, error: null);
+    try {
+      await _homeRepo.deleteHabit(habitId);
+      
+      ref.read(homeProvider.notifier).removeHabit(habitId);
+      state = state.copyWith(deleting: false);
+      return true;
+    } on ApiException catch (e) {
+      state = state.copyWith(deleting: false, error: e.message);
       return false;
     }
   }
@@ -192,10 +204,11 @@ final _weekRepo = HabitWeekRepository();
 
 final habitDetailProvider = StateNotifierProvider.autoDispose
     .family<HabitDetailNotifier, HabitDetailState, String>(
-      (ref, habitId) => HabitDetailNotifier(
+  (ref, habitId) => HabitDetailNotifier(
     ref.watch(subtaskRepositoryProvider),
     HomeRepository(),
     _weekRepo,
+    ref,
   ),
 );
 
@@ -216,23 +229,66 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
     Future.microtask(() => ref
         .read(habitDetailProvider(widget.habit.id).notifier)
         .init(widget.habit.id, widget.habit));
-    // In _HabitDetailScreenState.initState, after Future.microtask:
-    debugPrint('[HabitDetail] currentStreak=${widget.habit.currentStreak} bestStreak=${widget.habit.bestStreak}');
+  }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.darkSurface,
+        title: const Text(
+          'Delete Habit?',
+          style: TextStyle(color: AppColors.darkTextPrimary),
+        ),
+        content: Text(
+          'This will permanently delete "${widget.habit.name}" and all its logs. This cannot be undone.',
+          style: const TextStyle(color: AppColors.darkTextSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppColors.darkTextSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete',
+                style: TextStyle(
+                    color: AppColors.danger, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final success = await ref
+          .read(habitDetailProvider(widget.habit.id).notifier)
+          .deleteHabit(widget.habit.id);
+
+      if (success && mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Habit deleted'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-
     final homeHabits = ref.watch(homeProvider).habits;
     final updatedHabit = homeHabits.firstWhere(
-          (h) => h.id == widget.habit.id,
+      (h) => h.id == widget.habit.id,
       orElse: () => widget.habit,
     );
     final habit = widget.habit;
     final color = Color(int.parse(habit.color.replaceFirst('#', '0xFF')));
     final detail = ref.watch(habitDetailProvider(habit.id));
 
-    ref.listen<HabitDetailState>(habitDetailProvider(habit.id), (previous, next) {
+    ref.listen<HabitDetailState>(habitDetailProvider(habit.id), (_, next) {
       if (next.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -241,32 +297,20 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
         );
         ref.read(habitDetailProvider(habit.id).notifier).clearError();
       }
-      // Completion celebration
-      if (previous != null && !previous.isCompleted && next.isCompleted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (context.mounted) {
-            showHabitCompletionDialog(
-              context,
-              ref,
-              habitName: habit.name,
-              habitIcon: habit.icon,
-              habitColor: habit.color,
-            );
-          }
-        });
-      }
     });
 
     return Scaffold(
       backgroundColor: AppColors.darkBg,
       body: CustomScrollView(
         slivers: [
-          // ── Hero ────────────────────────────────────────────────
           SliverToBoxAdapter(
-            child: _HeroSection(habit: updatedHabit, color: color),
+            child: _HeroSection(
+              habit: updatedHabit,
+              color: color,
+              onDeleteTap: () => _confirmDelete(context),
+              isDeleting: detail.deleting,
+            ),
           ),
-
-          // ── Current Streak + Weekly calendar ────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -274,16 +318,12 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
                   habit: updatedHabit, detail: detail, color: color),
             ),
           ),
-
-          // ── Progress Journey ─────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               child: _ProgressCard(detail: detail, color: color),
             ),
           ),
-
-          // ── Next Milestone ───────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -291,8 +331,6 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
                   currentStreak: habit.currentStreak, color: color),
             ),
           ),
-
-          // ── Subtasks header ──────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
@@ -320,8 +358,6 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
               ),
             ),
           ),
-
-          // ── Subtask list ─────────────────────────────────────────
           if (detail.loading)
             const SliverToBoxAdapter(
               child: Padding(
@@ -337,10 +373,10 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                      (ctx, i) {
+                  (ctx, i) {
                     final subtask = detail.subtasks[i];
                     final result = detail.log?.subtaskResults.firstWhere(
-                          (r) => r.subtaskId == subtask.id,
+                      (r) => r.subtaskId == subtask.id,
                       orElse: () => SubtaskResult(
                           subtaskId: subtask.id, isCompleted: false),
                     );
@@ -350,22 +386,19 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
                       isDone: isDone,
                       color: color,
                       onTap: isDone
-                      ? null
-                      : () => ref
-                            .read(habitDetailProvider(habit.id).notifier)
-                            .toggleSubtask(habit.id, subtask.id, isDone),
+                          ? null
+                          : () => ref
+                              .read(habitDetailProvider(habit.id).notifier)
+                              .toggleSubtask(habit.id, subtask.id, isDone),
                     );
                   },
                   childCount: detail.subtasks.length,
                 ),
               ),
             ),
-
           const SliverToBoxAdapter(child: SizedBox(height: 110)),
         ],
       ),
-
-      // ── Bottom button ────────────────────────────────────────────
       bottomNavigationBar: _MarkCompleteButton(
         detail: detail,
         color: color,
@@ -391,12 +424,10 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
 // ─── Hero Section ─────────────────────────────────────────────────────────────
 String getBannerAsset(String habitName) {
   final name = habitName.toLowerCase();
-  print("DEBUG: Habit name received is: '$name'");
-  // Categorize based on what the habit is actually called
   if (name.contains('workout') || name.contains('gym') || name.contains('exercise')) {
     return 'assets/images/habit_1.png';
   }
-  if (name.contains('prayer / quran') || name.contains('quran')) {
+  if (name.contains('prayer') || name.contains('quran')) {
     return 'assets/images/habit_3.png';
   }
   if (name.contains('study')) {
@@ -405,16 +436,23 @@ String getBannerAsset(String habitName) {
   if (name.contains('diet')) {
     return 'assets/images/habit_4.png';
   }
-  if (name.contains('personal welfare')) {
+  if (name.contains('welfare')) {
     return 'assets/images/habit_5.png';
   }
-
-  return 'assets/images/habit_6.png'; // Fallback
+  return 'assets/images/habit_6.png';
 }
+
 class _HeroSection extends StatelessWidget {
-  const _HeroSection({required this.habit, required this.color});
+  const _HeroSection({
+    required this.habit,
+    required this.color,
+    required this.onDeleteTap,
+    required this.isDeleting,
+  });
   final TodayHabitModel habit;
   final Color color;
+  final VoidCallback onDeleteTap;
+  final bool isDeleting;
 
   @override
   Widget build(BuildContext context) {
@@ -422,22 +460,19 @@ class _HeroSection extends StatelessWidget {
       height: 460,
       child: Stack(
         children: [
-          // 1. Image Background
           Positioned.fill(
             child: Image.asset(
               getBannerAsset(habit.name),
               fit: BoxFit.cover,
             ),
           ),
-
-          // 2. Gradient Overlay at the bottom
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
             child: Container(
               height: 150,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -446,21 +481,21 @@ class _HeroSection extends StatelessWidget {
               ),
             ),
           ),
-
-          // 3. Header Content
           SafeArea(
             child: Column(
               children: [
-                // Top Bar: Back button + Centered Title
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 4, vertical: 8),
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
                       Align(
                         alignment: Alignment.centerLeft,
                         child: IconButton(
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                          icon: const Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              color: Colors.white),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ),
@@ -470,8 +505,56 @@ class _HeroSection extends StatelessWidget {
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
-                          shadows: [Shadow(color: Colors.black45, blurRadius: 4)],
+                          shadows: [
+                            Shadow(color: Colors.black45, blurRadius: 4)
+                          ],
                         ),
+                      ),
+                      // ── More menu ──────────────────────────────
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: isDeleting
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              )
+                            : PopupMenuButton<String>(
+                                icon: const Icon(Icons.more_vert_rounded,
+                                    color: Colors.white),
+                                color: AppColors.darkSurface,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(14)),
+                                onSelected: (value) {
+                                  if (value == 'delete') onDeleteTap();
+                                },
+                                itemBuilder: (_) => [
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.delete_outline_rounded,
+                                            color: AppColors.danger,
+                                            size: 18),
+                                        SizedBox(width: 10),
+                                        Text(
+                                          'Delete Habit',
+                                          style: TextStyle(
+                                              color: AppColors.danger,
+                                              fontSize: 14),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                       ),
                     ],
                   ),
@@ -484,6 +567,7 @@ class _HeroSection extends StatelessWidget {
     );
   }
 }
+
 // ─── Streak + Weekly Calendar Card ───────────────────────────────────────────
 class _StreakAndWeekCard extends StatelessWidget {
   const _StreakAndWeekCard({
@@ -522,7 +606,6 @@ class _StreakAndWeekCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Streak row
           Row(
             children: [
               const Text('🔥', style: TextStyle(fontSize: 22)),
@@ -530,13 +613,10 @@ class _StreakAndWeekCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Current Streak',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.darkTextSecondary,
-                    ),
-                  ),
+                  Text('Current Streak',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.darkTextSecondary)),
                   Text(
                     '${habit.currentStreak} days',
                     style: const TextStyle(
@@ -549,10 +629,7 @@ class _StreakAndWeekCard extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 18),
-
-          // Week day labels
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(7, (i) {
@@ -561,7 +638,6 @@ class _StreakAndWeekCard extends StatelessWidget {
               final isToday = dateStr == todayStr;
               final isDone = detail.weekCompletion[dateStr] == true;
               final isFuture = day.isAfter(today);
-
               return _WeekDayCell(
                 label: _dayLabels[i],
                 isDone: isDone,
@@ -602,8 +678,7 @@ class _WeekDayCell extends StatelessWidget {
       bgColor = AppColors.success.withOpacity(0.2);
       borderColor = AppColors.success.withOpacity(0.6);
       textColor = AppColors.success;
-      icon = const Icon(Icons.check_rounded,
-          size: 14, color: AppColors.success);
+      icon = const Icon(Icons.check_rounded, size: 14, color: AppColors.success);
     } else if (isToday) {
       bgColor = color.withOpacity(0.15);
       borderColor = color;
@@ -615,7 +690,6 @@ class _WeekDayCell extends StatelessWidget {
       textColor = AppColors.darkTextSecondary.withOpacity(0.3);
       icon = null;
     } else {
-      // Past, not done
       bgColor = AppColors.danger.withOpacity(0.08);
       borderColor = AppColors.danger.withOpacity(0.3);
       textColor = AppColors.darkTextSecondary;
@@ -624,14 +698,11 @@ class _WeekDayCell extends StatelessWidget {
 
     return Column(
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.darkTextSecondary,
-          ),
-        ),
+        Text(label,
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.darkTextSecondary)),
         const SizedBox(height: 6),
         AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -644,14 +715,11 @@ class _WeekDayCell extends StatelessWidget {
           ),
           child: Center(
             child: icon ??
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                  ),
-                ),
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: textColor)),
           ),
         ),
       ],
@@ -665,7 +733,6 @@ class _ProgressCard extends StatelessWidget {
   final HabitDetailState detail;
   final Color color;
 
-  // Simple level from streak — every 10 days = 1 level
   int get _level => (detail.completedCount ~/ 10) + 1;
   String get _levelLabel {
     final lvl = _level;
@@ -694,43 +761,30 @@ class _ProgressCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Progress Journey',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.darkTextPrimary,
-                ),
-              ),
-              // Mountain icon + XP label
+              const Text('Progress Journey',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.darkTextPrimary)),
               Row(
                 children: [
                   const Icon(Icons.terrain_rounded,
                       color: Colors.white54, size: 16),
                   const SizedBox(width: 4),
-                  Text(
-                    'Level $_level',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.darkTextSecondary,
-                    ),
-                  ),
+                  Text('Level $_level',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.darkTextSecondary)),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Text(
-            _levelLabel,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: color,
-            ),
-          ),
+          Text(_levelLabel,
+              style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w500, color: color)),
           const SizedBox(height: 12),
-          // Progress bar
           Container(
             height: 6,
             decoration: BoxDecoration(
@@ -743,25 +797,19 @@ class _ProgressCard extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [color, color.withOpacity(0.7)],
-                  ),
+                      colors: [color, color.withOpacity(0.7)]),
                   borderRadius: BorderRadius.circular(3),
                   boxShadow: [
-                    BoxShadow(
-                        color: color.withOpacity(0.4), blurRadius: 4),
+                    BoxShadow(color: color.withOpacity(0.4), blurRadius: 4)
                   ],
                 ),
               ),
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            '$pct% today',
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.darkTextSecondary,
-            ),
-          ),
+          Text('$pct% today',
+              style: const TextStyle(
+                  fontSize: 11, color: AppColors.darkTextSecondary)),
         ],
       ),
     );
@@ -770,16 +818,14 @@ class _ProgressCard extends StatelessWidget {
 
 // ─── Milestone Card ───────────────────────────────────────────────────────────
 class _MilestoneCard extends StatelessWidget {
-  const _MilestoneCard(
-      {required this.currentStreak, required this.color});
+  const _MilestoneCard({required this.currentStreak, required this.color});
   final int currentStreak;
   final Color color;
 
   static const _milestones = [10, 20, 30, 50, 75, 100, 150, 200, 365];
 
   String get _nextMilestoneLabel {
-    final next =
-    _milestones.where((m) => m > currentStreak).toList();
+    final next = _milestones.where((m) => m > currentStreak).toList();
     if (next.isEmpty) return 'All milestones unlocked 🏆';
     return 'Complete ${next.first} day streak';
   }
@@ -801,22 +847,15 @@ class _MilestoneCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Next Milestone',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.darkTextSecondary,
-                  ),
-                ),
+                const Text('Next Milestone',
+                    style: TextStyle(
+                        fontSize: 11, color: AppColors.darkTextSecondary)),
                 const SizedBox(height: 2),
-                Text(
-                  _nextMilestoneLabel,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.darkTextPrimary,
-                  ),
-                ),
+                Text(_nextMilestoneLabel,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.darkTextPrimary)),
               ],
             ),
           ),
@@ -848,21 +887,16 @@ class _SubtaskTile extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(bottom: 8),
-        padding:
-        const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
-          color:
-          isDone ? color.withOpacity(0.08) : AppColors.darkSurface,
+          color: isDone ? color.withOpacity(0.08) : AppColors.darkSurface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isDone
-                ? color.withOpacity(0.4)
-                : AppColors.darkBorder,
+            color: isDone ? color.withOpacity(0.4) : AppColors.darkBorder,
           ),
         ),
         child: Row(
           children: [
-            // Circle checkbox
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               width: 24,
@@ -892,40 +926,33 @@ class _SubtaskTile extends StatelessWidget {
                       color: isDone
                           ? AppColors.darkTextSecondary
                           : AppColors.darkTextPrimary,
-                      decoration: isDone
-                          ? TextDecoration.lineThrough
-                          : null,
+                      decoration:
+                          isDone ? TextDecoration.lineThrough : null,
                       decorationColor: AppColors.darkTextSecondary,
                     ),
                   ),
                   if (subtask.targetValue != null &&
                       subtask.unit != null) ...[
                     const SizedBox(height: 2),
-                    Text(
-                      '${subtask.targetValue} ${subtask.unit}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.darkTextSecondary,
-                      ),
-                    ),
+                    Text('${subtask.targetValue} ${subtask.unit}',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.darkTextSecondary)),
                   ],
                 ],
               ),
             ),
             if (!subtask.isRequired)
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.darkBorder,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  'Optional',
-                  style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.darkTextSecondary),
-                ),
+                child: const Text('Optional',
+                    style: TextStyle(
+                        fontSize: 10, color: AppColors.darkTextSecondary)),
               )
             else
               Icon(
@@ -933,9 +960,7 @@ class _SubtaskTile extends StatelessWidget {
                     ? Icons.check_circle_rounded
                     : Icons.radio_button_unchecked_rounded,
                 size: 18,
-                color: isDone
-                    ? color
-                    : AppColors.darkTextSecondary,
+                color: isDone ? color : AppColors.darkTextSecondary,
               ),
           ],
         ),
@@ -961,10 +986,9 @@ class _MarkCompleteButton extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(
           20, 12, 20, 12 + MediaQuery.of(context).padding.bottom),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.darkBg,
-        border:
-        const Border(top: BorderSide(color: AppColors.darkBorder)),
+        border: Border(top: BorderSide(color: AppColors.darkBorder)),
       ),
       child: SizedBox(
         width: double.infinity,
@@ -973,18 +997,18 @@ class _MarkCompleteButton extends StatelessWidget {
           onPressed: (isDone || detail.marking) ? null : onTap,
           icon: detail.marking
               ? const SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: Colors.white),
-          )
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
               : Icon(
-            isDone
-                ? Icons.check_circle_rounded
-                : Icons.check_rounded,
-            color: Colors.white,
-            size: 20,
-          ),
+                  isDone
+                      ? Icons.check_circle_rounded
+                      : Icons.check_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
           label: Text(
             isDone ? 'Completed ✓' : 'Mark as Completed',
             style: const TextStyle(
@@ -995,7 +1019,7 @@ class _MarkCompleteButton extends StatelessWidget {
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor:
-            isDone ? AppColors.success.withOpacity(0.5) : color,
+                isDone ? AppColors.success.withOpacity(0.5) : color,
             disabledBackgroundColor: isDone
                 ? AppColors.success.withOpacity(0.35)
                 : color.withOpacity(0.4),

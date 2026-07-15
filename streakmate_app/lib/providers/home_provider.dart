@@ -78,17 +78,18 @@ class HomeNotifier extends StateNotifier<HomeState> {
     required int totalSubtasks,
   }) async {
     final existingHabit = state.habits.firstWhere((h) => h.id == habitId);
-    final needsLogCreation = existingHabit.todayLog == null; // capture BEFORE optimistic update
+    final needsLogCreation = existingHabit.todayLog == null;
 
-    _optimisticallyToggleSubtask(habitId, subtaskId, !currentValue, totalSubtasks);
-
+    // ✅ Single write: optimistic update + loading flag together
+    final optimisticHabits = _buildOptimisticHabits(
+      habitId, subtaskId, !currentValue, totalSubtasks,
+    );
     final loading = Set<String>.from(state.loadingHabitIds)..add(habitId);
-    state = state.copyWith(loadingHabitIds: loading);
+    state = state.copyWith(habits: optimisticHabits, loadingHabitIds: loading);
 
     try {
       if (needsLogCreation) {
-        final log = await _repository.createLog(habitId);
-        _applyLog(habitId, log);
+        await _repository.createLog(habitId);
       }
 
       final updatedLog = await _repository.updateSubtaskResult(
@@ -99,8 +100,11 @@ class HomeNotifier extends StateNotifier<HomeState> {
       _applyLog(habitId, updatedLog);
     } on ApiException catch (e) {
       debugPrint('[Home] toggleSubtask failed: ${e.message}');
-      _optimisticallyToggleSubtask(habitId, subtaskId, currentValue, totalSubtasks);
-      state = state.copyWith(errorMessage: e.message);
+      // ✅ Revert optimistic update on failure
+      final revertHabits = _buildOptimisticHabits(
+        habitId, subtaskId, currentValue, totalSubtasks,
+      );
+      state = state.copyWith(habits: revertHabits, errorMessage: e.message);
     } finally {
       final done = Set<String>.from(state.loadingHabitIds)..remove(habitId);
       state = state.copyWith(loadingHabitIds: done);
@@ -112,7 +116,6 @@ class HomeNotifier extends StateNotifier<HomeState> {
   void clearError() => state = state.copyWith(errorMessage: null);
 
   Future<void> _checkYesterday() async {
-    // Only check once per app session
     if (state.yesterdayChecked) return;
 
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
@@ -131,8 +134,6 @@ class HomeNotifier extends StateNotifier<HomeState> {
 
     final dayData = calState.month?.days[dateStr];
 
-    // Mark checked BEFORE setting missedYesterdayDate so subsequent
-    // loadToday() calls skip this entirely
     state = state.copyWith(yesterdayChecked: true);
 
     if (dayData != null && dayData.status == DayStatus.missed) {
@@ -144,59 +145,89 @@ class HomeNotifier extends StateNotifier<HomeState> {
     state = state.copyWith(clearMissedYesterday: true);
   }
 
- void _optimisticallyToggleSubtask(
-    String habitId, String subtaskId, bool newValue, int totalSubtasks) {
-  final habits = state.habits.map((h) {
-    if (h.id != habitId) return h;
+  /// Returns a new habits list with the subtask toggled — does NOT write state.
+  /// Caller is responsible for writing state (allows batching with other fields).
+  List<TodayHabitModel> _buildOptimisticHabits(
+    String habitId,
+    String subtaskId,
+    bool newValue,
+    int totalSubtasks,
+  ) {
+    return state.habits.map((h) {
+      if (h.id != habitId) return h;
 
-    final existingResults = h.todayLog?.subtaskResults ?? [];
-    final hasResult = existingResults.any((r) => r.subtaskId == subtaskId);
+      final existingResults = h.todayLog?.subtaskResults ?? [];
+      final hasResult = existingResults.any((r) => r.subtaskId == subtaskId);
 
-    final results = hasResult
-        ? existingResults.map((r) {
-            if (r.subtaskId != subtaskId) return r;
-            return r.copyWith(isCompleted: newValue);
-          }).toList()
-        : [
-            ...existingResults,
-            SubtaskResult(subtaskId: subtaskId, isCompleted: newValue),
-          ];
+      final results = hasResult
+          ? existingResults.map((r) {
+              if (r.subtaskId != subtaskId) return r;
+              return r.copyWith(isCompleted: newValue);
+            }).toList()
+          : [
+              ...existingResults,
+              SubtaskResult(subtaskId: subtaskId, isCompleted: newValue),
+            ];
 
-    final completed = results.where((r) => r.isCompleted).length;
-    final pct = totalSubtasks == 0
-        ? 0
-        : ((completed / totalSubtasks) * 100).round();
-    final allDone = totalSubtasks > 0 && completed == totalSubtasks;
+      final completed = results.where((r) => r.isCompleted).length;
+      final pct = totalSubtasks == 0
+          ? 0
+          : ((completed / totalSubtasks) * 100).round();
+      final allDone = totalSubtasks > 0 && completed == totalSubtasks;
 
-    final baseLog = h.todayLog ??
-        HabitLogModel(
-          id: '',
-          habitId: habitId,
-          userId: '',
-          date: '',
-          subtaskResults: const [],
-          isCompleted: false,
-          completionPercentage: 0,
-          loggedOffline: false,
-        );
+      final baseLog = h.todayLog ??
+          HabitLogModel(
+            id: '',
+            habitId: habitId,
+            userId: '',
+            date: '',
+            subtaskResults: const [],
+            isCompleted: false,
+            completionPercentage: 0,
+            loggedOffline: false,
+          );
 
-    return h.copyWith(
-      todayLog: baseLog.copyWith(
-        subtaskResults: results,
-        completionPercentage: pct,
-        isCompleted: allDone,
-      ),
-    );
-  }).toList();
-  state = state.copyWith(habits: habits);
-}
+      return h.copyWith(
+        todayLog: baseLog.copyWith(
+          subtaskResults: results,
+          completionPercentage: pct,
+          isCompleted: allDone,
+        ),
+      );
+    }).toList();
+  }
 
-  void _applyLog(String habitId, HabitLogModel log) {
+  /// Merges server log into current state.
+  /// Server result wins for the updated subtask; optimistic state kept for the rest.
+  void _applyLog(String habitId, HabitLogModel updatedLog) {
     final habits = state.habits.map((h) {
       if (h.id != habitId) return h;
-      return h.copyWith(todayLog: log);
+
+      final existingResults = h.todayLog?.subtaskResults ?? [];
+      final mergedResults = [...existingResults];
+
+      for (final serverResult in updatedLog.subtaskResults) {
+        final idx = mergedResults.indexWhere(
+          (r) => r.subtaskId == serverResult.subtaskId,
+        );
+        if (idx != -1) {
+          mergedResults[idx] = serverResult;
+        } else {
+          mergedResults.add(serverResult);
+        }
+      }
+
+      final mergedLog = updatedLog.copyWith(subtaskResults: mergedResults);
+      return h.copyWith(todayLog: mergedLog);
     }).toList();
+
     state = state.copyWith(habits: habits);
+  }
+
+  void removeHabit(String habitId) {
+    state = state.copyWith(
+      habits: state.habits.where((h) => h.id != habitId).toList(),
+    );
   }
 }
 
