@@ -164,6 +164,11 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
 
   // ── Step 4: Subtasks (combined, all habits) ──────────────────────────────
   void toggleSubtask(String habitId, String subtaskId) {
+    final habit = state.habits.firstWhere((h) => h.id == habitId);
+    final matches = habit.subtasks.where((s) => s.id == subtaskId);
+    if (matches.isEmpty) return;
+    if (matches.first.isRequired) return; // required subtasks can't be removed
+
     final current = Set<String>.from(state.enabledSubtaskIds[habitId] ?? {});
     if (current.contains(subtaskId)) {
       current.remove(subtaskId);

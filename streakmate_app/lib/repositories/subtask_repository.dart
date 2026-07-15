@@ -32,6 +32,29 @@ class SubtaskRepository {
           statusCode: e.response?.statusCode);
     }
   }
+
+  /// DELETE /habits/:habitId/subtasks/:subtaskId
+  Future<void> deleteSubtask(String habitId, String subtaskId) async {
+    try {
+      final response = await _dio.delete(
+        ApiEndpoints.subtaskById(habitId, subtaskId),
+      );
+      if (response.statusCode != 200) {
+        throw ApiException(
+          response.data['message'] as String? ?? 'Could not delete subtask',
+          statusCode: response.statusCode,
+        );
+      }
+    } on DioException catch (e) {
+      final msg = e.response?.data is Map
+          ? (e.response?.data['message'] as String?)
+          : null;
+      throw ApiException(msg ?? 'Something went wrong.',
+          statusCode: e.response?.statusCode);
+    } on ApiException {
+      rethrow;
+    }
+  }
 }
 
 final subtaskRepositoryProvider =

@@ -13,7 +13,7 @@ class SubtaskTile extends StatelessWidget {
     required this.metaLabel,
     required this.enabled,
     required this.color,
-    required this.onToggle,
+    this.onToggle, // now optional
     this.isOptionalLabel = false,
   });
 
@@ -22,11 +22,13 @@ class SubtaskTile extends StatelessWidget {
   final String metaLabel;
   final bool enabled;
   final Color color;
-  final VoidCallback onToggle;
+  final VoidCallback? onToggle; // was required VoidCallback
   final bool isOptionalLabel;
 
   @override
   Widget build(BuildContext context) {
+    final isLocked = onToggle == null;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -55,26 +57,29 @@ class SubtaskTile extends StatelessWidget {
                 Text(
                   metaLabel,
                   style: AppTextStyles.lightCardSubtitle.copyWith(
-                    color: isOptionalLabel ? AppColors.lightTextSecondary : AppColors.lightTextSecondary,
+                    color: AppColors.lightTextSecondary,
                     fontStyle: isOptionalLabel ? FontStyle.italic : FontStyle.normal,
                   ),
                 ),
               ],
             ),
           ),
-          GestureDetector(
-            onTap: onToggle,
-            child: Container(
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: enabled ? color : Colors.transparent,
-                border: Border.all(color: enabled ? color : AppColors.lightCardBorder, width: 1.4),
+          if (isLocked)
+            Icon(Icons.lock_outline, size: 18, color: AppColors.lightTextSecondary.withOpacity(0.6))
+          else
+            GestureDetector(
+              onTap: onToggle,
+              child: Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: enabled ? color : Colors.transparent,
+                  border: Border.all(color: enabled ? color : AppColors.lightCardBorder, width: 1.4),
+                ),
+                child: enabled ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
               ),
-              child: enabled ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
             ),
-          ),
           const SizedBox(width: 4),
           Icon(Icons.drag_indicator, size: 18, color: AppColors.lightTextSecondary.withOpacity(0.5)),
         ],

@@ -160,16 +160,14 @@ class SubtaskSetupScreen extends ConsumerWidget {
                                 enabled: enabled.contains(subtask.id),
                                 color: color,
                                 isOptionalLabel: !subtask.isRequired,
-                                onToggle: () => ref
-                                    .read(onboardingProvider.notifier)
-                                    .toggleSubtask(habit.id, subtask.id),
+                                onToggle: subtask.isRequired ? null
+                                  : () => ref.read(onboardingProvider.notifier).toggleSubtask(habit.id, subtask.id),
                               );
                             }),
-                            AddCustomSubtaskRow(   // was _AddCustomSubtaskRow
-                              color: color,
+                            AddCustomSubtaskRow( color: color,
                               onAdd: (name) => ref.read(onboardingProvider.notifier).addCustomSubtaskDraft(habit.id, name),
                             ),
-],
+              ],
                         ),
                       );
                     },

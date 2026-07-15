@@ -197,6 +197,22 @@ class HabitDetailNotifier extends StateNotifier<HabitDetailState> {
     }
   }
 
+  Future<bool> deleteSubtask(String habitId, String subtaskId) async {
+  try {
+    await _subtaskRepo.deleteSubtask(habitId, subtaskId);
+    final updatedSubtasks =
+        state.subtasks.where((s) => s.id != subtaskId).toList();
+    state = state.copyWith(subtasks: updatedSubtasks);
+
+    ref.invalidate(subtasksProvider(habitId));
+
+    return true;
+  } on ApiException catch (e) {
+    state = state.copyWith(error: e.message);
+    return false;
+  }
+}
+
   void clearError() => state = state.copyWith(error: null);
 }
 
@@ -374,24 +390,59 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (ctx, i) {
-                    final subtask = detail.subtasks[i];
-                    final result = detail.log?.subtaskResults.firstWhere(
-                      (r) => r.subtaskId == subtask.id,
-                      orElse: () => SubtaskResult(
-                          subtaskId: subtask.id, isCompleted: false),
-                    );
-                    final isDone = result?.isCompleted ?? false;
-                    return _SubtaskTile(
-                      subtask: subtask,
-                      isDone: isDone,
-                      color: color,
-                      onTap: isDone
-                          ? null
-                          : () => ref
-                              .read(habitDetailProvider(habit.id).notifier)
-                              .toggleSubtask(habit.id, subtask.id, isDone),
-                    );
-                  },
+  final subtask = detail.subtasks[i];
+  final result = detail.log?.subtaskResults.firstWhere(
+    (r) => r.subtaskId == subtask.id,
+    orElse: () => SubtaskResult(
+        subtaskId: subtask.id, isCompleted: false),
+  );
+  final isDone = result?.isCompleted ?? false;
+  return _SubtaskTile(
+    subtask: subtask,
+    isDone: isDone,
+    color: color,
+    onTap: isDone
+        ? null
+        : () => ref
+            .read(habitDetailProvider(habit.id).notifier)
+            .toggleSubtask(habit.id, subtask.id, isDone),
+    onDelete: subtask.isRequired
+        ? null
+        : () async {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                backgroundColor: AppColors.darkSurface,
+                title: const Text('Remove sub-task?',
+                    style: TextStyle(color: AppColors.darkTextPrimary)),
+                content: Text(
+                  'This will permanently remove "${subtask.name}" from this habit.',
+                  style: const TextStyle(color: AppColors.darkTextSecondary),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel',
+                        style: TextStyle(color: AppColors.darkTextSecondary)),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Remove',
+                        style: TextStyle(
+                            color: AppColors.danger,
+                            fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true) {
+              await ref
+                  .read(habitDetailProvider(habit.id).notifier)
+                  .deleteSubtask(habit.id, subtask.id);
+            }
+          },
+        );
+      },
                   childCount: detail.subtasks.length,
                 ),
               ),
@@ -874,11 +925,13 @@ class _SubtaskTile extends StatelessWidget {
     required this.isDone,
     required this.color,
     required this.onTap,
+    required this.onDelete, // new
   });
   final SubtaskModel subtask;
   final bool isDone;
   final Color color;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete; // new, null if not deletable
 
   @override
   Widget build(BuildContext context) {
@@ -942,7 +995,7 @@ class _SubtaskTile extends StatelessWidget {
                 ],
               ),
             ),
-            if (!subtask.isRequired)
+            if (!subtask.isRequired) ...[
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -953,8 +1006,16 @@ class _SubtaskTile extends StatelessWidget {
                 child: const Text('Optional',
                     style: TextStyle(
                         fontSize: 10, color: AppColors.darkTextSecondary)),
-              )
-            else
+              ),
+              if (onDelete != null) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: onDelete,
+                  child: const Icon(Icons.close_rounded,
+                      size: 18, color: AppColors.danger),
+                ),
+              ],
+            ] else
               Icon(
                 isDone
                     ? Icons.check_circle_rounded
