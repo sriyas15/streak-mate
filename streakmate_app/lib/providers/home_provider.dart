@@ -15,12 +15,14 @@ class HomeState {
   final Set<String> loadingHabitIds;
   final String? missedYesterdayDate;
   final bool yesterdayChecked;
+  final Set<String> loadingSubtaskIds;
 
   const HomeState({
     this.status = HomeStatus.initial,
     this.habits = const [],
     this.errorMessage,
     this.loadingHabitIds = const {},
+    this.loadingSubtaskIds = const {},
     this.missedYesterdayDate,
     this.yesterdayChecked = false,
   });
@@ -30,6 +32,7 @@ class HomeState {
     List<TodayHabitModel>? habits,
     String? errorMessage,
     Set<String>? loadingHabitIds,
+    Set<String>? loadingSubtaskIds,
     String? missedYesterdayDate,
     bool clearMissedYesterday = false,
     bool? yesterdayChecked,
@@ -39,6 +42,7 @@ class HomeState {
       habits: habits ?? this.habits,
       errorMessage: errorMessage,
       loadingHabitIds: loadingHabitIds ?? this.loadingHabitIds,
+      loadingSubtaskIds: loadingSubtaskIds ?? this.loadingSubtaskIds,
       missedYesterdayDate: clearMissedYesterday
           ? null
           : (missedYesterdayDate ?? this.missedYesterdayDate),
@@ -72,44 +76,53 @@ class HomeNotifier extends StateNotifier<HomeState> {
   }
 
   Future<void> toggleSubtask({
-    required String habitId,
-    required String subtaskId,
-    required bool currentValue,
-    required int totalSubtasks,
-  }) async {
-    final existingHabit = state.habits.firstWhere((h) => h.id == habitId);
-    final needsLogCreation = existingHabit.todayLog == null;
+  required String habitId,
+  required String subtaskId,
+  required bool currentValue,
+  required int totalSubtasks,
+}) async {
+  // ✅ Ignore tap if this specific subtask already has an API call in flight
+  if (state.loadingSubtaskIds.contains(subtaskId)) return;
 
-    // ✅ Single write: optimistic update + loading flag together
-    final optimisticHabits = _buildOptimisticHabits(
-      habitId, subtaskId, !currentValue, totalSubtasks,
-    );
-    final loading = Set<String>.from(state.loadingHabitIds)..add(habitId);
-    state = state.copyWith(habits: optimisticHabits, loadingHabitIds: loading);
+  final existingHabit = state.habits.firstWhere((h) => h.id == habitId);
+  final needsLogCreation = existingHabit.todayLog == null;
 
-    try {
-      if (needsLogCreation) {
-        await _repository.createLog(habitId);
-      }
+  final optimisticHabits = _buildOptimisticHabits(
+    habitId, subtaskId, !currentValue, totalSubtasks,
+  );
+  final loading = Set<String>.from(state.loadingHabitIds)..add(habitId);
+  final loadingSubtasks = Set<String>.from(state.loadingSubtaskIds)..add(subtaskId); // ✅
+  state = state.copyWith(
+    habits: optimisticHabits,
+    loadingHabitIds: loading,
+    loadingSubtaskIds: loadingSubtasks, // ✅
+  );
 
-      final updatedLog = await _repository.updateSubtaskResult(
-        habitId: habitId,
-        subtaskId: subtaskId,
-        isCompleted: !currentValue,
-      );
-      _applyLog(habitId, updatedLog);
-    } on ApiException catch (e) {
-      debugPrint('[Home] toggleSubtask failed: ${e.message}');
-      // ✅ Revert optimistic update on failure
-      final revertHabits = _buildOptimisticHabits(
-        habitId, subtaskId, currentValue, totalSubtasks,
-      );
-      state = state.copyWith(habits: revertHabits, errorMessage: e.message);
-    } finally {
-      final done = Set<String>.from(state.loadingHabitIds)..remove(habitId);
-      state = state.copyWith(loadingHabitIds: done);
+  try {
+    if (needsLogCreation) {
+      await _repository.createLog(habitId);
     }
+    final updatedLog = await _repository.updateSubtaskResult(
+      habitId: habitId,
+      subtaskId: subtaskId,
+      isCompleted: !currentValue,
+    );
+    _applyLog(habitId, updatedLog);
+  } on ApiException catch (e) {
+    debugPrint('[Home] toggleSubtask failed: ${e.message}');
+    final revertHabits = _buildOptimisticHabits(
+      habitId, subtaskId, currentValue, totalSubtasks,
+    );
+    state = state.copyWith(habits: revertHabits, errorMessage: e.message);
+  } finally {
+    final done = Set<String>.from(state.loadingHabitIds)..remove(habitId);
+    final doneSubtasks = Set<String>.from(state.loadingSubtaskIds)..remove(subtaskId); // ✅
+    state = state.copyWith(
+      loadingHabitIds: done,
+      loadingSubtaskIds: doneSubtasks, // ✅
+    );
   }
+}
 
   Future<void> refresh() => loadToday();
 
