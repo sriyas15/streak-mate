@@ -64,6 +64,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     });
 
+    // Show "account created" confirmation once, after arriving from Register.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (authState.justRegistered) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created! Please log in.'),
+            backgroundColor: AppColors.sproutGreenDark,
+          ),
+        );
+        ref.read(authProvider.notifier).clearJustRegistered();
+      }
+    });
+
     return Scaffold(
       backgroundColor: AppColors.lightBg,
       body: SafeArea(

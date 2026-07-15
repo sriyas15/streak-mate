@@ -16,22 +16,26 @@ class AuthState {
   final AuthStatus status;
   final UserModel? user;
   final String? errorMessage;
+  final bool justRegistered;
 
   const AuthState({
     this.status = AuthStatus.unknown,
     this.user,
     this.errorMessage,
+    this.justRegistered = false,
   });
 
   AuthState copyWith({
     AuthStatus? status,
     UserModel? user,
     String? errorMessage,
+    bool? justRegistered,
   }) {
     return AuthState(
       status: status ?? this.status,
       user: user ?? this.user,
       errorMessage: errorMessage,
+      justRegistered: justRegistered ?? this.justRegistered,
     );
   }
 }
@@ -62,23 +66,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> register({
+Future<void> register({
     required String name,
     required String username,
     required String email,
     required String password,
   }) async {
-    if (state.status == AuthStatus.authenticating) return; // guard double-tap
+    if (state.status == AuthStatus.authenticating) return;
     state = state.copyWith(status: AuthStatus.authenticating, errorMessage: null);
     try {
-      final user = await _repository.register(
+      await _repository.register(
         name: name,
         username: username,
         email: email,
         password: password,
       );
-      debugPrint('[Auth] Register success — user: ${user.email}');
-      state = state.copyWith(status: AuthStatus.authenticated, user: user);
+      // Registration succeeded, but we don't want to auto-login the user —
+      // discard any tokens the backend returned and send them to /login instead.
+      await SecureStorageService.instance.clearTokens();
+      debugPrint('[Auth] Register success — redirecting to login');
+      state = const AuthState(
+        status: AuthStatus.unauthenticated,
+        justRegistered: true,
+      );
     } on ApiException catch (e) {
       debugPrint('[Auth] Register failed — ${e.statusCode}: ${e.message}');
       state = state.copyWith(status: AuthStatus.error, errorMessage: e.message);
@@ -172,6 +182,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   void clearError() {
     state = state.copyWith(errorMessage: null);
+  }
+  void clearJustRegistered() {
+    state = state.copyWith(justRegistered: false);
   }
 }
 

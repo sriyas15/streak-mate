@@ -25,12 +25,11 @@ import 'route_names.dart';
 /// logic can be wired and tested end-to-end with login/register.
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
-
   return GoRouter(
     initialLocation: RouteNames.splash,
     refreshListenable: _AuthRefreshStream(ref),
     redirect: (context, state) {
+      final authState = ref.read(authProvider);
       final status = authState.status;
       final loggingInOrOut = state.matchedLocation == RouteNames.login ||
           state.matchedLocation == RouteNames.register;

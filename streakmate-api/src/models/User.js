@@ -31,7 +31,19 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       minlength: 8,
-      select: false, // never returned in queries by default
+      select: false,
+      validate: {
+        validator: function (value) {
+          // only enforce when the field is being set/changed (avoids re-validating hashed value on unrelated updates)
+          if (!this.isModified('password')) return true;
+          return (
+            /[A-Z]/.test(value) &&
+            /[0-9]/.test(value) &&
+            /[!@#$%^&*(),.?":{}|<>_\-[\]\\/~`+=;]/.test(value)
+          );
+        },
+        message: 'Password must include at least one uppercase letter, one number, and one special character',
+      },
     },
     profilePicture: {
       type: String,

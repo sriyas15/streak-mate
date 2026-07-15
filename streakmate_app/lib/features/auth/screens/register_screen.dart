@@ -79,6 +79,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         );
         ref.read(authProvider.notifier).clearError();
+        return;
+      }
+      if (next.status == AuthStatus.unauthenticated && next.justRegistered) {
+        context.go(RouteNames.login);
       }
     });
 

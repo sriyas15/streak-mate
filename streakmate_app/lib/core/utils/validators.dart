@@ -26,6 +26,15 @@ class Validators {
     if (!AppConstants.usernamePattern.hasMatch(trimmed)) {
       return 'Only lowercase letters, numbers and underscores';
     }
+    if (!RegExp(r'^[a-z]').hasMatch(trimmed)) {
+      return 'Username must start with a letter';
+    }
+    if (trimmed.contains('__')) {
+      return 'Username can\'t contain consecutive underscores';
+    }
+    if (trimmed.endsWith('_')) {
+      return 'Username can\'t end with an underscore';
+    }
     return null;
   }
 
@@ -40,6 +49,15 @@ class Validators {
     if (value.isEmpty) return 'Password is required';
     if (value.length < AppConstants.passwordMinLength) {
       return 'Password must be at least ${AppConstants.passwordMinLength} characters';
+    }
+    if (!RegExp(r'[A-Z]').hasMatch(value)) {
+      return 'Password must include at least one uppercase letter';
+    }
+    if (!RegExp(r'[0-9]').hasMatch(value)) {
+      return 'Password must include at least one number';
+    }
+    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>_\-\[\]\\/~`+=;]').hasMatch(value)) {
+      return 'Password must include at least one special character';
     }
     return null;
   }
