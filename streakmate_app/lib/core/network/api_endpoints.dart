@@ -66,4 +66,7 @@ class ApiEndpoints {
 
   static String markNotifRead(String id) => '/notifications/$id/read';
   static String deleteNotif(String id) => '/notifications/$id';
+  
+  // ─── User Timezone ───────────────────────────────────────────────────────
+  static const String updateTimezone = '/auth/timezone';
 }
