@@ -24,6 +24,7 @@ export const registerSchema = z.object({
     .max(64, 'Password too long')
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[0-9]/, 'Password must contain at least one number'),
+  timezone: z.string().trim().optional(),
 })
 
 export const loginSchema = z.object({
@@ -35,6 +36,7 @@ export const loginSchema = z.object({
   password: z
     .string({ required_error: 'Password is required' })
     .min(1, 'Password is required'),
+  timezone: z.string().trim().optional(),
 })
 
 export const forgotPasswordSchema = z.object({

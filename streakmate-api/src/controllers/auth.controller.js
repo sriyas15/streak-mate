@@ -3,8 +3,8 @@ import { authService } from '../services/auth.service.js'
 export const authController = {
   // POST /auth/register
   register: async (req, reply) => {
-    const { name, username, email, password } = req.body
-    const result = await authService.register({ name, username, email, password })
+    const { name, username, email, password, timezone } = req.body
+    const result = await authService.register({ name, username, email, password, timezone })
     return reply.code(201).send({
       success: true,
       message: 'Account created. Please verify your email.',
@@ -14,13 +14,20 @@ export const authController = {
 
   // POST /auth/login
   login: async (req, reply) => {
-    const { email, password } = req.body
-    const result = await authService.login({ email, password })
+    const { email, password, timezone } = req.body
+    const result = await authService.login({ email, password, timezone })
     return reply.send({
       success: true,
       message: 'Login successful',
       data: result,
     })
+  },
+
+  // auth.controller.js
+  updateTimezone: async (req, reply) => {
+    const { timezone } = req.body
+    const user = await authService.updateTimezone(req.user._id, timezone)
+    return reply.send({ success: true, data: { user } })
   },
 
   // POST /auth/logout

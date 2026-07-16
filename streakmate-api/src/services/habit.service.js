@@ -1,6 +1,6 @@
-import { Habit, Subtask, HabitLog } from '../models/index.js'
+import { Habit, Subtask, HabitLog, User } from '../models/index.js'
 import { deleteCache, deletePattern, CACHE_KEYS } from '../config/redis.js'
-import { getTodayDate } from '../utils/dateHelper.js'
+import { getTodayDate, getTodayDayOfWeek } from '../utils/dateHelper.js'
 import { HABIT_TEMPLATES } from '../utils/constants.js'
 
 export const habitService = {
@@ -179,8 +179,9 @@ createHabit: async (userId, body) => {
 
   // ── Get today's habits with log status ───────────────────────────
   getTodayHabits: async (userId) => {
-    const today = getTodayDate()
-    const dayOfWeek = new Date().getDay()
+    const user = await User.findById(userId)
+    const today = getTodayDate(user.timezone)
+    const dayOfWeek = getTodayDayOfWeek(user.timezone)
 
     const habits = await Habit.find({
       userId,

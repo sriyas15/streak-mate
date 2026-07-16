@@ -7,81 +7,98 @@ import { signAccessToken, signRefreshToken, verifyAccessToken, verifyRefreshToke
 
 // ─── Auth service ────────────────────────────────────────────────────────────
 export const authService = {
+
   // ── Register ────────────────────────────────────────────────────
-  register: async ({ name, username, email, password }) => {
-    const existingEmail = await User.findOne({ email }).select('_id')
-    if (existingEmail) {
-      const err = new Error('Email already in use')
-      err.statusCode = 409
+register: async ({ name, username, email, password, timezone }) => {  // ADD timezone HERE
+  const existingEmail = await User.findOne({ email }).select('_id')
+  if (existingEmail) {
+    const err = new Error('Email already in use')
+    err.statusCode = 409
+    throw err
+  }
+
+  const existingUsername = await User.findOne({ username }).select('_id')
+  if (existingUsername) {
+    const err = new Error('Username already taken')
+    err.statusCode = 409
+    throw err
+  }
+
+  const verificationToken = crypto.randomBytes(32).toString('hex')
+  const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+  const user = await User.create({
+    name,
+    username: username.toLowerCase(),
+    email: email.toLowerCase(),
+    password,
+    timezone: timezone || 'UTC',
+    emailVerificationToken: verificationToken,
+    emailVerificationExpiry: verificationExpiry,
+  })
+
+  const accessToken = signAccessToken(user._id)
+  const refreshToken = signRefreshToken(user._id)
+
+  await User.findByIdAndUpdate(user._id, { refreshToken })
+
+  return {
+    accessToken,
+    refreshToken,
+    user: sanitizeUser(user),
+  }
+},
+
+// ── Login ───────────────────────────────────────────────────────
+login: async ({ email, password, timezone }) => {
+  console.log('LOGIN — received timezone:', timezone)
+  const user = await User.findOne({ email: email.toLowerCase() }).select('+password +refreshToken')
+  if (!user) {
+    const err = new Error('Invalid email or password')
+    err.statusCode = 401
+    throw err
+  }
+
+  const isMatch = await user.comparePassword(password)
+  if (!isMatch) {
+    const err = new Error('Invalid email or password')
+    err.statusCode = 401
+    throw err
+  }
+
+  const accessToken = signAccessToken(user._id)
+  const refreshToken = signRefreshToken(user._id)
+
+  const updates = { refreshToken, lastActiveAt: new Date() }
+  console.log('LOGIN — user.timezone in DB:', user.timezone)
+
+  if (timezone && timezone !== user.timezone) {
+    updates.timezone = timezone
+  }
+  console.log('LOGIN — updates object:', updates)
+  await User.findByIdAndUpdate(user._id, updates)
+
+  return {
+    accessToken,
+    refreshToken,
+    user: sanitizeUser({ ...user.toObject(), ...updates }),
+  }
+},
+
+  // auth.service.js
+  updateTimezone: async (userId, timezone) => {
+    if (!timezone) {
+      const err = new Error('Timezone is required')
+      err.statusCode = 400
       throw err
     }
-
-    const existingUsername = await User.findOne({ username }).select('_id')
-    if (existingUsername) {
-      const err = new Error('Username already taken')
-      err.statusCode = 409
-      throw err
-    }
-
-    const verificationToken = crypto.randomBytes(32).toString('hex')
-    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24hrs
-
-    const user = await User.create({
-      name,
-      username: username.toLowerCase(),
-      email: email.toLowerCase(),
-      password,
-      emailVerificationToken: verificationToken,
-      emailVerificationExpiry: verificationExpiry,
-    })
-
-    const accessToken = signAccessToken(user._id)
-    const refreshToken = signRefreshToken(user._id)
-
-    // Save refresh token to user
-    await User.findByIdAndUpdate(user._id, { refreshToken })
-
-    // TODO: send verification email via scheduler
-
-    return {
-      accessToken,
-      refreshToken,
-      user: sanitizeUser(user),
-    }
-  },
-
-  // ── Login ───────────────────────────────────────────────────────
-  login: async ({ email, password }) => {
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password +refreshToken')
+    const user = await User.findByIdAndUpdate(userId, { timezone }, { new: true })
     if (!user) {
-      const err = new Error('Invalid email or password')
-      err.statusCode = 401
+      const err = new Error('User not found')
+      err.statusCode = 404
       throw err
     }
-
-    const isMatch = await user.comparePassword(password)
-    if (!isMatch) {
-      const err = new Error('Invalid email or password')
-      err.statusCode = 401
-      throw err
-    }
-
-    const accessToken = signAccessToken(user._id)
-    const refreshToken = signRefreshToken(user._id)
-
-    await User.findByIdAndUpdate(user._id, {
-      refreshToken,
-      lastActiveAt: new Date(),
-    })
-
-    // Invalidate any cached profile
-    // await deleteCache(CACHE_KEYS.userProfile(user._id))
-
-    return {
-      accessToken,
-      refreshToken,
-      user: sanitizeUser(user),
-    }
+    return sanitizeUser(user)
   },
 
   // ── Logout ──────────────────────────────────────────────────────

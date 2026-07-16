@@ -17,6 +17,11 @@ export const getTodayUTC = () => {
   return new Date().toISOString().split('T')[0]
 }
 
+export const getTodayDayOfWeek = (timezone = 'Asia/Kolkata') => {
+  const todayStr = getTodayDate(timezone) // "YYYY-MM-DD" in user's tz
+  return parseDate(todayStr).getUTCDay() // 0=Sun ... 6=Sat, safe since parseDate uses noon UTC
+}
+
 // ─── Get yesterday's date string ────────────────────────────────────────────
 export const getYesterdayDate = (timezone = 'Asia/Kolkata') => {
   const d = new Date()

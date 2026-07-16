@@ -20,6 +20,9 @@ export const authRoutes = async (fastify) => {
     handler: authController.login,
   })
 
+  // auth.routes.js
+  fastify.patch('/timezone', { preHandler: authenticate, handler: authController.updateTimezone })
+
   fastify.post('/refresh-token', {
     handler: authController.refreshToken,
   })

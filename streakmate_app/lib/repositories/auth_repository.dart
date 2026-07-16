@@ -4,7 +4,8 @@ import '../core/network/api_exception.dart';
 import '../core/network/dio_client.dart';
 import '../core/storage/secure_storage.dart';
 import '../models/remote/user_model.dart';
-
+import '../core/utils/device_timezone.dart';
+import 'package:flutter/foundation.dart'; // Required for debugPrint
 /// auth_repository.dart
 /// Talks to /auth/* endpoints and persists tokens on success.
 /// Maps backend's { success, message, data } envelope into typed results
@@ -26,11 +27,14 @@ class AuthRepository {
     required String password,
   }) async {
     try {
+      final timezone = await DeviceTimezone.getTimezone();
+      debugPrint('DETECTED TIMEZONE: $timezone');
       final response = await _dio.post(ApiEndpoints.register, data: {
         'name': name,
         'username': username,
         'email': email,
         'password': password,
+        'timezone': timezone,
       });
 
       if (response.statusCode == 201 && response.data['success'] == true) {
@@ -52,15 +56,18 @@ class AuthRepository {
   }
 
   /// POST /auth/login
-  /// Body: { email, password }
+  /// Body: { email, password, timezone }
   Future<UserModel> login({
     required String email,
     required String password,
   }) async {
     try {
+      final timezone = await DeviceTimezone.getTimezone();
+      debugPrint('DETECTED TIMEZONE: $timezone');
       final response = await _dio.post(ApiEndpoints.login, data: {
         'email': email,
         'password': password,
+        'timezone': timezone,
       });
 
       if (response.statusCode == 200 && response.data['success'] == true) {
