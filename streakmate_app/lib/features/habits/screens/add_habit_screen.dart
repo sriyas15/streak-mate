@@ -62,7 +62,14 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
       }
     });
 
-    return Scaffold(
+    return PopScope(
+      canPop: _step == 1, // ✅ only allow system back to pop when on step 1
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _step == 2) {
+          setState(() => _step = 1); // ✅ system back on step 2 → go to step 1
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppColors.darkBg,
       appBar: AppBar(
         backgroundColor: AppColors.darkBg,
@@ -116,6 +123,7 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                 onSave: _save,
               ),
       ),
+    )
     );
   }
 }
