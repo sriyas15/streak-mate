@@ -107,7 +107,7 @@ class HomeNotifier extends StateNotifier<HomeState> {
       subtaskId: subtaskId,
       isCompleted: !currentValue,
     );
-    _applyLog(habitId, updatedLog);
+    _applyLog(habitId, updatedLog, subtaskId);
   } on ApiException catch (e) {
     debugPrint('[Home] toggleSubtask failed: ${e.message}');
     final revertHabits = _buildOptimisticHabits(
@@ -212,30 +212,45 @@ class HomeNotifier extends StateNotifier<HomeState> {
 
   /// Merges server log into current state.
   /// Server result wins for the updated subtask; optimistic state kept for the rest.
-  void _applyLog(String habitId, HabitLogModel updatedLog) {
-    final habits = state.habits.map((h) {
-      if (h.id != habitId) return h;
+  void _applyLog(String habitId, HabitLogModel updatedLog, String subtaskId) {
+  final habits = state.habits.map((h) {
+    if (h.id != habitId) return h;
 
-      final existingResults = h.todayLog?.subtaskResults ?? [];
-      final mergedResults = [...existingResults];
+    final existingResults = h.todayLog?.subtaskResults ?? [];
 
-      for (final serverResult in updatedLog.subtaskResults) {
-        final idx = mergedResults.indexWhere(
-          (r) => r.subtaskId == serverResult.subtaskId,
-        );
-        if (idx != -1) {
-          mergedResults[idx] = serverResult;
-        } else {
-          mergedResults.add(serverResult);
-        }
-      }
+    // ✅ Only update the specific subtask from server, keep everything else as-is
+    final serverResult = updatedLog.subtaskResults.firstWhere(
+      (r) => r.subtaskId == subtaskId,
+      orElse: () => SubtaskResult(subtaskId: subtaskId, isCompleted: true),
+    );
 
-      final mergedLog = updatedLog.copyWith(subtaskResults: mergedResults);
-      return h.copyWith(todayLog: mergedLog);
+    final mergedResults = existingResults.map((r) {
+      if (r.subtaskId != subtaskId) return r; // ✅ keep optimistic state
+      return serverResult;                     // ✅ server wins only for this subtask
     }).toList();
 
-    state = state.copyWith(habits: habits);
-  }
+    // Use server's completionPercentage and isCompleted only if no other
+    // subtasks are still in-flight, otherwise keep optimistic values
+    final hasOtherInFlight = state.loadingSubtaskIds
+        .where((id) => id != subtaskId)
+        .isNotEmpty;
+
+    final mergedLog = updatedLog.copyWith(
+      subtaskResults: mergedResults,
+      // ✅ if other subtasks are still being toggled, trust our optimistic pct
+      completionPercentage: hasOtherInFlight
+          ? h.todayLog?.completionPercentage ?? updatedLog.completionPercentage
+          : updatedLog.completionPercentage,
+      isCompleted: hasOtherInFlight
+          ? h.todayLog?.isCompleted ?? updatedLog.isCompleted
+          : updatedLog.isCompleted,
+    );
+
+    return h.copyWith(todayLog: mergedLog);
+  }).toList();
+
+  state = state.copyWith(habits: habits);
+}
 
   void removeHabit(String habitId) {
     state = state.copyWith(
