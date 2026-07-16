@@ -58,7 +58,7 @@ class ApiEndpoints {
       '/habits/$habitId/logs/$date/subtasks/$subtaskId';
 
   // ─── Notifications ──────────────────────────────────────────────────────
-  static const String fcmToken = '/notifications/fcm-token';
+  static const String fcmToken = '/notifications/token';
   static const String unreadCount = '/notifications/unread-count';
   static const String notificationsList = '/notifications';
   static const String readAll = '/notifications/read-all';
