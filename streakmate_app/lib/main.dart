@@ -9,6 +9,7 @@ import 'core/router/route_names.dart';
 import 'core/theme/dark_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/notification_provider.dart';
+import 'core/socket/socket_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,6 +40,26 @@ class _StreakMateAppState extends ConsumerState<StreakMateApp> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initFCM();
+      _initSocket();
+    });
+  }
+
+  Future<void> _initSocket() async {
+    final authState = ref.read(authProvider);
+
+    if (authState.status == AuthStatus.authenticated) {
+      await ref.read(socketServiceProvider).connect();
+    }
+
+    // Keep socket connected/disconnected in sync with auth changes
+    ref.listenManual(authProvider, (previous, next) {
+      if (next.status == AuthStatus.authenticated &&
+          previous?.status != AuthStatus.authenticated) {
+        ref.read(socketServiceProvider).connect();
+      } else if (next.status == AuthStatus.unauthenticated &&
+          previous?.status == AuthStatus.authenticated) {
+        ref.read(socketServiceProvider).disconnect();
+      }
     });
   }
 
