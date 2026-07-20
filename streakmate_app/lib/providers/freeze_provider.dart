@@ -59,6 +59,7 @@ class FreezeNotifier extends StateNotifier<FreezeState> {
 
   /// Activates a freeze for [date] (defaults to today, "YYYY-MM-DD").
   Future<bool> activateFreeze({String? date, String? reason}) async {
+    if (state.activating) return false;
     state = state.copyWith(activating: true, error: null, successMessage: null);
     try {
       final balance = await _repo.activateFreeze(
@@ -81,6 +82,7 @@ class FreezeNotifier extends StateNotifier<FreezeState> {
 
   /// Activates a cheat day for [date] (defaults to today).
   Future<bool> activateCheatDay({String? date}) async {
+    if (state.activating) return false;
     state = state.copyWith(activating: true, error: null, successMessage: null);
     try {
       final balance = await _repo.activateCheatDay(date: date ?? _today());

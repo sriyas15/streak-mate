@@ -10,9 +10,4 @@ export const dayLogRoutes = async (fastify) => {
   fastify.get('/:date', { handler: dayLogController.getByDate })
   fastify.patch('/:date/mood', { handler: dayLogController.updateMood })
   fastify.patch('/:date/note', { handler: dayLogController.updateNote })
-
-  // ─── Freeze / Cheat ───────────────────────────────────────────
-  fastify.post('/:date/freeze', { handler: dayLogController.activateFreeze })
-  fastify.post('/:date/cheat-day', { handler: dayLogController.activateCheatDay })
-  fastify.delete('/:date/freeze', { handler: dayLogController.undoFreeze })
 }

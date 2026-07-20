@@ -123,7 +123,6 @@ export const habitLogService = {
 
     const month = date.substring(0, 7)
     await deleteCache(CACHE_KEYS.calendarMonth(userId, month))
-
     return log
   },
 

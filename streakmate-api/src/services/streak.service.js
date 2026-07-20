@@ -87,6 +87,8 @@ export const streakService = {
     let streak = await Streak.findOne({ userId, habitId })
     if (!streak) streak = new Streak({ userId, habitId })
 
+    if (streak.currentStreakEnd === date) return
+
     const yesterday = getPreviousDate(date)
     const wasYesterdayComplete = await HabitLog.findOne({
       userId,
@@ -152,6 +154,7 @@ export const streakService = {
     })
 
     await deleteCache(CACHE_KEYS.habitStreak(userId, habitId))
+    await deleteCache(CACHE_KEYS.userStreak(userId)) 
 
     const MILESTONES = [7, 14, 30, 50, 100]
     if (MILESTONES.includes(streak.currentStreakCount)) {
@@ -185,6 +188,10 @@ export const streakService = {
   handleProductiveDay: async (userId, date) => {
     let streak = await Streak.findOne({ userId, habitId: null })
     if (!streak) streak = new Streak({ userId, habitId: null })
+
+    if (streak.currentStreakEnd === date) {
+      return streak   // already counted today — no-op
+    }
 
     const yesterday = getPreviousDate(date)
     const yesterdayLog = await DayLog.findOne({ userId, date: yesterday }).lean()
@@ -254,6 +261,40 @@ export const streakService = {
       await enqueueAchievementCheck(userId, `streak_${streak.currentStreakCount}`)
     }
   },
+
+  // ── Handle day becoming unproductive (uncomplete rollback) ───────
+handleUnproductiveDay: async (userId, date) => {
+  const streak = await Streak.findOne({ userId, habitId: null })
+  if (!streak) return
+
+  // Only roll back if this date was the tip of the current streak
+  if (streak.currentStreakEnd === date && streak.currentStreakCount > 0) {
+    streak.currentStreakCount = Math.max(0, streak.currentStreakCount - 1)
+    streak.currentStreakEnd = getPreviousDate(date)
+    if (streak.currentStreakCount === 0) streak.currentStreakStart = null
+    streak.totalCompletedDays = Math.max(0, streak.totalCompletedDays - 1)
+    streak.completionRate = streak.totalDaysTracked > 0
+      ? Math.round((streak.totalCompletedDays / streak.totalDaysTracked) * 100)
+      : 0
+    streak.lastUpdated = new Date()
+    await streak.save()
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { currentStreakDays: streak.currentStreakCount },
+      { new: true }
+    ).select('currentStreakDays bestStreakDays').lean()
+
+    await deleteCache(CACHE_KEYS.userStreak(userId))
+    await deleteCache(CACHE_KEYS.userProfile(userId))
+
+    emitToUser(userId, SOCKET_EVENTS.STREAK_UPDATED, {
+      currentStreakDays: streak.currentStreakCount,
+      bestStreakDays: updatedUser?.bestStreakDays ?? streak.bestStreakCount,
+      date,
+    })
+  }
+},
 
   // ── Full recalculate (used after freeze/cheat day) ───────────────
   // Walks ALL DayLog records and correctly handles gaps (missed days

@@ -39,24 +39,5 @@ export const dayLogController = {
     const { note } = req.body
     const dayLog = await dayLogService.updateNote(req.user._id, req.params.date, note)
     return reply.send({ success: true, message: 'Note updated', data: { dayLog } })
-  },
-
-  // POST /daylogs/:date/freeze
-  activateFreeze: async (req, reply) => {
-    const { reason } = req.body
-    const result = await dayLogService.activateFreeze(req.user._id, req.params.date, reason)
-    return reply.send({ success: true, message: 'Freeze activated. Streak protected ❄️', data: result })
-  },
-
-  // POST /daylogs/:date/cheat-day
-  activateCheatDay: async (req, reply) => {
-    const result = await dayLogService.activateCheatDay(req.user._id, req.params.date)
-    return reply.send({ success: true, message: 'Cheat day used. No judgement 😏', data: result })
-  },
-
-  // DELETE /daylogs/:date/freeze
-  undoFreeze: async (req, reply) => {
-    await dayLogService.undoFreeze(req.user._id, req.params.date)
-    return reply.send({ success: true, message: 'Freeze removed' })
-  },
+  }
 }

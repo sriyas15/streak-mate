@@ -2,7 +2,7 @@ import { User, DayLog } from '../models/index.js'
 import { streakService } from './streak.service.js'
 import { getTodayDate } from '../utils/dateHelper.js'
 import { deleteCache, CACHE_KEYS } from '../config/redis.js'
-
+import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
 
 export const freezeService = {
   // ── Get freeze/cheat balance ─────────────────────────────────────
@@ -36,7 +36,7 @@ export const freezeService = {
       ),
       User.findByIdAndUpdate(userId, {
         $inc: { freezesUsed: 1, freezesRemaining: -1 },
-      }),
+      },{new:true}).select('freezesRemaining freezesUsed totalFreezesAlloted cheatDaysRemaining cheatDaysUsed cheatDaysAlloted'),
     ])
 
     const month = date.substring(0, 7) // "YYYY-MM" from "YYYY-MM-DD"
@@ -53,7 +53,11 @@ export const freezeService = {
       log,
       balance: {
         freezesRemaining: user.freezesRemaining - 1,
+        freezesUsed: user.freezesUsed + 1,
+        totalFreezesAlloted: user.totalFreezesAlloted,
         cheatDaysRemaining: user.cheatDaysRemaining,
+        cheatDaysUsed: user.cheatDaysUsed,
+        cheatDaysAlloted: user.cheatDaysAlloted,
       },
     }
   },
@@ -71,15 +75,17 @@ export const freezeService = {
     if (existingLog?.isCheatDay) throwBadRequest('Cheat day already applied to this date')
     if (existingLog?.isFreezeDay) throwBadRequest('Cannot apply cheat day — this date has a freeze')
 
-    const [log] = await Promise.all([
+    const [log, updatedUser] = await Promise.all([
       DayLog.findOneAndUpdate(
         { userId, date },
         { isCheatDay: true },
         { upsert: true, new: true }
       ),
-      User.findByIdAndUpdate(userId, {
-        $inc: { cheatDaysUsed: 1, cheatDaysRemaining: -1 },
-      }),
+      User.findByIdAndUpdate(
+        userId,
+        { $inc: { cheatDaysUsed: 1, cheatDaysRemaining: -1 } },
+        { new: true }
+      ).select('freezesRemaining freezesUsed totalFreezesAlloted cheatDaysRemaining cheatDaysUsed cheatDaysAlloted'),
     ])
     const month = date.substring(0, 7)
     await deleteCache(CACHE_KEYS.calendarMonth(userId, month))
@@ -95,7 +101,11 @@ export const freezeService = {
       log,
       balance: {
         freezesRemaining: user.freezesRemaining,
+        freezesUsed: user.freezesUsed,
+        totalFreezesAlloted: user.totalFreezesAlloted,
         cheatDaysRemaining: user.cheatDaysRemaining - 1,
+        cheatDaysUsed: user.cheatDaysUsed + 1,
+        cheatDaysAlloted: user.cheatDaysAlloted,
       },
     }
   },

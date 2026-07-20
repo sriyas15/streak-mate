@@ -80,89 +80,10 @@ export const dayLogService = {
     return log
   },
 
-  // ── Activate freeze ──────────────────────────────────────────────
-  activateFreeze: async (userId, date, reason) => {
-    const user = await User.findById(userId)
-    if (!user) throwNotFound('User')
-
-    if (user.freezesRemaining <= 0) {
-      throwBadRequest('No freeze days remaining this month')
-    }
-
-    const today = getTodayDate()
-    if (date > today) throwBadRequest('Cannot freeze a future date')
-
-    const existing = await DayLog.findOne({ userId, date })
-    if (existing?.isFreezeDay) throwBadRequest('This day is already frozen')
-    if (existing?.isCheatDay) throwBadRequest('This day already has a cheat day applied')
-
-    const [log] = await Promise.all([
-      DayLog.findOneAndUpdate(
-        { userId, date },
-        { isFreezeDay: true, freezeReason: reason || null },
-        { upsert: true, new: true }
-      ),
-      User.findByIdAndUpdate(userId, {
-        $inc: { freezesUsed: 1, freezesRemaining: -1 },
-      }),
-    ])
-
-    // Recalculate streak — freeze protects it
-    await streakService.recalculate(userId)
-
-    return { log, freezesRemaining: user.freezesRemaining - 1 }
-  },
-
-  // ── Activate cheat day ───────────────────────────────────────────
-  activateCheatDay: async (userId, date) => {
-    const user = await User.findById(userId)
-    if (!user) throwNotFound('User')
-
-    if (user.cheatDaysRemaining <= 0) {
-      throwBadRequest('No cheat days remaining this month')
-    }
-
-    const existing = await DayLog.findOne({ userId, date })
-    if (existing?.isCheatDay) throwBadRequest('Cheat day already applied')
-    if (existing?.isFreezeDay) throwBadRequest('This day already has a freeze applied')
-
-    const [log] = await Promise.all([
-      DayLog.findOneAndUpdate(
-        { userId, date },
-        { isCheatDay: true },
-        { upsert: true, new: true }
-      ),
-      User.findByIdAndUpdate(userId, {
-        $inc: { cheatDaysUsed: 1, cheatDaysRemaining: -1 },
-      }),
-    ])
-
-    await streakService.recalculate(userId)
-
-    return { log, cheatDaysRemaining: user.cheatDaysRemaining - 1 }
-  },
-
-  // ── Undo freeze (same day only) ──────────────────────────────────
-  undoFreeze: async (userId, date) => {
-    const today = getTodayDate()
-    if (date !== today) throwBadRequest('Can only undo a freeze on the same day it was applied')
-
-    const log = await DayLog.findOne({ userId, date })
-    if (!log?.isFreezeDay) throwBadRequest('No freeze to undo on this date')
-
-    await Promise.all([
-      DayLog.findOneAndUpdate({ userId, date }, { isFreezeDay: false, freezeReason: null }),
-      User.findByIdAndUpdate(userId, { $inc: { freezesUsed: -1, freezesRemaining: 1 } }),
-    ])
-
-    await streakService.recalculate(userId)
-  },
-
   // ── Recalculate productivity score for a date ─────────────────────
   // Called after every habit log update
   recalculate: async (userId, date) => {
-    const dayOfWeek = new Date(date + 'T00:00:00').getDay()
-
+    const dayOfWeek = new Date(date + 'T12:00:00Z').getUTCDay()
     const habits = await Habit.find({
       userId,
       isActive: true,
@@ -172,7 +93,29 @@ export const dayLogService = {
       $or: [{ endDate: null }, { endDate: { $gte: date } }],
     }).lean()
 
-    if (habits.length === 0) return
+    if (habits.length === 0) {
+      const dayLog = await DayLog.findOneAndUpdate(
+        { userId, date },
+        {
+          totalHabits: 0,
+          completedHabits: 0,
+          skippedHabits: 0,
+          productivityScore: 0,
+          isProductiveDay: false,   // no habits scheduled ≠ "productive"; adjust to `true` if you want habit-free days to count as good days
+        },
+        { upsert: true, new: true }
+      )
+
+      emitToUser(userId, SOCKET_EVENTS.CALENDAR_UPDATED, {
+        date,
+        status: dayLog.isFreezeDay ? 'freeze' : dayLog.isCheatDay ? 'cheat' : 'none',
+        productivityScore: 0,
+        completedHabits: 0,
+        totalHabits: 0,
+      })
+
+      return dayLog
+    }
 
     const habitIds = habits.map((h) => h._id)
     const logs = await HabitLog.find({ userId, date, habitId: { $in: habitIds } }).lean()
@@ -187,7 +130,7 @@ export const dayLogService = {
       {
         totalHabits,
         completedHabits,
-        skippedHabits: totalHabits - completedHabits - logs.filter((l) => !l.isCompleted).length,
+        skippedHabits: totalHabits - completedHabits,
         productivityScore,
         isProductiveDay,
       },
@@ -207,7 +150,9 @@ export const dayLogService = {
     if (isProductiveDay) {
       await streakService.handleProductiveDay(userId, date)
       emitToUser(userId, SOCKET_EVENTS.STREAK_UPDATED, { date, productivityScore })
-    }
+    }else {
+    await streakService.handleUnproductiveDay(userId, date)
+  }
 
     return dayLog
   },

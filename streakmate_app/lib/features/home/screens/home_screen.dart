@@ -89,11 +89,6 @@ void initState() {
   Future.microtask(() async {
     await ref.read(homeProvider.notifier).loadToday();
     await ref.read(unreadCountProvider.notifier).fetch();
-    if (!mounted) return;
-    final missed = ref.read(homeProvider).missedYesterdayDate;
-    if (missed != null) {
-      _showMissedYesterdayDialog(context, ref, missed);
-    }
   });
 }
 
