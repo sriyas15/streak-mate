@@ -56,6 +56,7 @@ class HabitDetailState {
   final HabitLogModel? log;
   final List<SubtaskModel> subtasks;
   final Map<String, bool> weekCompletion;
+  final Set<String> loadingSubtaskIds;
   final String? error;
 
   const HabitDetailState({
@@ -65,6 +66,7 @@ class HabitDetailState {
     this.log,
     this.subtasks = const [],
     this.weekCompletion = const {},
+    this.loadingSubtaskIds = const {},
     this.error,
   });
 
@@ -75,6 +77,7 @@ class HabitDetailState {
     HabitLogModel? log,
     List<SubtaskModel>? subtasks,
     Map<String, bool>? weekCompletion,
+    Set<String>? loadingSubtaskIds,
     String? error,
   }) =>
       HabitDetailState(
@@ -84,6 +87,7 @@ class HabitDetailState {
         log: log ?? this.log,
         subtasks: subtasks ?? this.subtasks,
         weekCompletion: weekCompletion ?? this.weekCompletion,
+        loadingSubtaskIds: loadingSubtaskIds ?? this.loadingSubtaskIds,
         error: error,
       );
 
@@ -101,6 +105,8 @@ class HabitDetailNotifier extends StateNotifier<HabitDetailState> {
   final HomeRepository _homeRepo;
   final HabitWeekRepository _weekRepo;
   final Ref ref;
+  Future<void>? _pendingLogCreation;
+  int _subtaskRequestSeq = 0; 
 
   Future<void> init(String habitId, TodayHabitModel habit) async {
     state = state.copyWith(loading: true, error: null);
@@ -122,47 +128,60 @@ class HabitDetailNotifier extends StateNotifier<HabitDetailState> {
 
   Future<void> toggleSubtask(
       String habitId, String subtaskId, bool currentValue) async {
-    if (state.log == null) {
-      try {
-        final log = await _homeRepo.createLog(habitId);
-        state = state.copyWith(log: log);
-      } on ApiException catch (e) {
-        state = state.copyWith(error: e.message);
-        return;
-      }
-    }
+    if (currentValue) return;
+    if (state.loadingSubtaskIds.contains(subtaskId)) return;   // ← ADD: block re-tap
 
-    final results = state.log!.subtaskResults.map((r) {
-      if (r.subtaskId != subtaskId) return r;
-      return r.copyWith(isCompleted: !currentValue);
-    }).toList();
-    final completed = results.where((r) => r.isCompleted).length;
-    final pct = results.isEmpty
-        ? 0
-        : ((completed / results.length) * 100).round();
-    state = state.copyWith(
-      log: state.log!.copyWith(
-        subtaskResults: results,
-        completionPercentage: pct,
-      ),
-    );
+    final mySeq = ++_subtaskRequestSeq;                        // ← ADD: this call's sequence number
+
+    final loadingSet = Set<String>.from(state.loadingSubtaskIds)..add(subtaskId);
+    state = state.copyWith(loadingSubtaskIds: loadingSet);
 
     try {
+      if (state.log == null) {
+        // Dedup log creation across concurrent first-taps
+        if (_pendingLogCreation == null) {
+          _pendingLogCreation = _homeRepo.createLog(habitId).then((log) {
+            if (state.log == null) state = state.copyWith(log: log);
+          }).whenComplete(() => _pendingLogCreation = null);
+        }
+        await _pendingLogCreation;
+      }
+
+      // Optimistic update
+      final results = state.log!.subtaskResults.map((r) {
+        if (r.subtaskId != subtaskId) return r;
+        return r.copyWith(isCompleted: !currentValue);
+      }).toList();
+      final completed = results.where((r) => r.isCompleted).length;
+      final pct = results.isEmpty ? 0 : ((completed / results.length) * 100).round();
+      state = state.copyWith(
+        log: state.log!.copyWith(subtaskResults: results, completionPercentage: pct),
+      );
+
       final updated = await _homeRepo.updateSubtaskResult(
         habitId: habitId,
         subtaskId: subtaskId,
         isCompleted: !currentValue,
       );
-      state = state.copyWith(log: updated);
+
+      // ← ADD: only apply if this is still the latest request for this subtask
+      if (mySeq == _subtaskRequestSeq) {
+        state = state.copyWith(log: updated);
+      }
     } on ApiException catch (e) {
-      final rolled = state.log!.subtaskResults.map((r) {
-        if (r.subtaskId != subtaskId) return r;
-        return r.copyWith(isCompleted: currentValue);
-      }).toList();
-      state = state.copyWith(
-        log: state.log!.copyWith(subtaskResults: rolled),
-        error: e.message,
-      );
+      if (mySeq == _subtaskRequestSeq) {
+        final rolled = state.log!.subtaskResults.map((r) {
+          if (r.subtaskId != subtaskId) return r;
+          return r.copyWith(isCompleted: currentValue);
+        }).toList();
+        state = state.copyWith(
+          log: state.log!.copyWith(subtaskResults: rolled),
+          error: e.message,
+        );
+      }
+    } finally {
+      final doneSet = Set<String>.from(state.loadingSubtaskIds)..remove(subtaskId);
+      state = state.copyWith(loadingSubtaskIds: doneSet);
     }
   }
 
@@ -401,11 +420,10 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
     subtask: subtask,
     isDone: isDone,
     color: color,
-    onTap: isDone
-        ? null
-        : () => ref
-            .read(habitDetailProvider(habit.id).notifier)
-            .toggleSubtask(habit.id, subtask.id, isDone),
+    onTap: detail.loadingSubtaskIds.contains(subtask.id)
+      ? null   // disable tap while this subtask's request is in flight
+      : () => ref.read(habitDetailProvider(habit.id).notifier)
+              .toggleSubtask(habit.id, subtask.id, isDone),
     onDelete: subtask.isRequired
         ? null
         : () async {
@@ -936,7 +954,7 @@ class _SubtaskTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: isDone ? null : onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(bottom: 8),
@@ -1015,15 +1033,7 @@ class _SubtaskTile extends StatelessWidget {
                       size: 18, color: AppColors.danger),
                 ),
               ],
-            ] else
-              Icon(
-                isDone
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                size: 18,
-                color: isDone ? color : AppColors.darkTextSecondary,
-              ),
-          ],
+            ],]
         ),
       ),
     );
