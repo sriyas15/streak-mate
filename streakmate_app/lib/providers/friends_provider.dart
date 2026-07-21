@@ -67,45 +67,32 @@ class FriendsNotifier extends StateNotifier<FriendsState> {
   final Ref ref;
 
   Future<void> loadAll() async {
-    state = state.copyWith(loading: true, error: null);
-    try {
-      final results = await Future.wait([
-        _friends.getFriends(),
-        _friends.getIncomingRequests(),
-        _leaderboard.getFriendsLeaderboard(),
-        _friends.getActivity(),
-      ]);
-      state = state.copyWith(
-        loading: false,
-        friends: results[0] as List<FriendModel>,
-        incomingRequests: results[1] as List<FriendRequestModel>,
-        suggestions: results[2] as List<FriendModel>,
-        leaderboard: results[3] as List<LeaderboardEntry>,
-        activity: results[4] as List<FriendActivityItem>,
-      );
-    } on ApiException catch (e) {
-      debugPrint('[Friends] loadAll error: ${e.message}');
-      state = state.copyWith(loading: false, error: e.message);
-    } catch (e) {
-      debugPrint('[Friends] loadAll unexpected: $e');
-      state = state.copyWith(
-          loading: false, error: 'Could not load friends');
-    }
+  state = state.copyWith(loading: true, error: null);
+  try {
+    final results = await Future.wait([
+      _friends.getFriends(),                 // 0
+      _friends.getIncomingRequests(),        // 1
+      _friends.getSuggestions(),             // 2
+      _leaderboard.getFriendsLeaderboard(),  // 3
+      _friends.getActivity(),                // 4
+    ]);
+    state = state.copyWith(
+      loading: false,
+      friends: results[0] as List<FriendModel>,
+      incomingRequests: results[1] as List<FriendRequestModel>,
+      suggestions: results[2] as List<FriendModel>,
+      leaderboard: results[3] as List<LeaderboardEntry>,
+      activity: results[4] as List<FriendActivityItem>,
+    );
+  } on ApiException catch (e) {
+    debugPrint('[Friends] loadAll error: ${e.message}');
+    state = state.copyWith(loading: false, error: e.message);
+  } catch (e) {
+    debugPrint('[Friends] loadAll unexpected: $e');
+    state = state.copyWith(loading: false, error: 'Could not load friends');
   }
+}
 
-  // Future<void> search(String query) async {
-  //   if (query.trim().length < 2) {
-  //     state = state.copyWith(searchResults: []);
-  //     return;
-  //   }
-  //   state = state.copyWith(searchLoading: true);
-  //   try {
-  //     final results = await _friends.searchUsers(query.trim());
-  //     state = state.copyWith(searchLoading: false, searchResults: results);
-  //   } on ApiException catch (e) {
-  //     state = state.copyWith(searchLoading: false, error: e.message);
-  //   }
-  // }
   Future<void> search(String query) async {
   if (query.trim().length < 2) {
     state = state.copyWith(searchResults: [], searchLoading: false);

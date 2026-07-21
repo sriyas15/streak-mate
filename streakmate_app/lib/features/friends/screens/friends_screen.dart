@@ -60,7 +60,14 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
                   controller: _tab,
                   children: [
                     _LeaderboardTab(leaderboard: state.leaderboard,activity: state.activity, myUserId: myUserId),
-                    _FriendsLogTab(friends: state.friends, activity: state.activity, onNudge: (id) => ref.read(friendsProvider.notifier).nudge(id)),
+                    _FriendsLogTab(
+                      friends: state.friends,
+                      incomingRequests: state.incomingRequests,
+                      activity: state.activity,
+                      onNudge: (id) => ref.read(friendsProvider.notifier).nudge(id),
+                      onAccept: (id) => ref.read(friendsProvider.notifier).acceptRequest(id),
+                      onReject: (id) => ref.read(friendsProvider.notifier).rejectRequest(id),
+                    ),
                     _DiscoverTab(
                       suggestions: state.suggestions,
                       searchResults: state.searchResults,
@@ -230,15 +237,32 @@ class _PodiumCard extends StatelessWidget {
 // ── Friends Log Tab ──────────────────────────────────────────────────────────
 class _FriendsLogTab extends StatelessWidget {
   final List<FriendModel> friends;
+  final List<FriendRequestModel> incomingRequests;
   final List<FriendActivityItem> activity;
   final ValueChanged<String> onNudge;
-  const _FriendsLogTab({required this.friends, required this.activity, required this.onNudge});
+  final ValueChanged<String> onAccept;
+  final ValueChanged<String> onReject;
+
+  const _FriendsLogTab({
+    required this.friends,
+    required this.incomingRequests,
+    required this.activity,
+    required this.onNudge,
+    required this.onAccept,
+    required this.onReject,
+  });
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        if (incomingRequests.isNotEmpty)
+          _RequestsBanner(
+            requests: incomingRequests,
+            onAccept: onAccept,
+            onReject: onReject,
+          ),
         const Text('My Friends', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
         ...friends.map((f) => ListTile(
@@ -247,8 +271,6 @@ class _FriendsLogTab extends StatelessWidget {
           subtitle: Text('Streak: ${f.currentStreakDays}'),
         )),
         const Divider(color: AppColors.darkBorder),
-        // const Text('Activity Logs', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        // ...activity.map((a) => _ActivityTile(item: a)),
       ],
     );
   }

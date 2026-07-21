@@ -86,29 +86,32 @@ class FCMService {
 
   // ── Register FCM token with backend ────────────────────────────────────────
   Future<void> registerToken({required Dio dio, String? token}) async {
-    try {
-      final fcmToken = token ?? await _messaging.getToken();
-      if (fcmToken == null) {
-        debugPrint('[FCM] Could not get token');
-        return;
-      }
-
-      debugPrint('[FCM] Registering token: ${fcmToken.substring(0, 20)}...');
-
-      await dio.post(
-        ApiEndpoints.fcmToken,
-        data: {
-          'token':       fcmToken,
-          'device':      'android', // TODO: use Platform.isIOS ? 'ios' : 'android'
-          'appVersion':  '1.0.0',
-        },
-      );
-
-      debugPrint('[FCM] Token registered with backend');
-    } catch (e) {
-      debugPrint('[FCM] Token registration failed: $e');
+  try {
+    final fcmToken = token ?? await _messaging.getToken();
+    if (fcmToken == null) {
+      debugPrint('[FCM] Could not get token');
+      return;
     }
+
+    final r = await dio.post(
+      ApiEndpoints.fcmToken,
+      data: {
+        'token': fcmToken,
+        'device': 'android',
+        'appVersion': '1.0.0',
+      },
+    );
+
+    if (r.statusCode != 200 && r.statusCode != 201) {
+      debugPrint('[FCM] Token registration rejected by server: ${r.statusCode} ${r.data}');
+      return;
+    }
+
+    debugPrint('[FCM] Token registered with backend');
+  } catch (e) {
+    debugPrint('[FCM] Token registration failed: $e');
   }
+}
 
   // ── Remove token on logout ─────────────────────────────────────────────────
   Future<void> removeToken({required Dio dio}) async {
