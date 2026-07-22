@@ -11,6 +11,7 @@ import '../../features/onboarding/screens/subtask_setup_screen.dart';
 import '../../features/onboarding/screens/reminder_setup_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
+import '../../features/profile/screens/achievements_screen.dart';
 import 'route_names.dart';
 
 /// app_router.dart
@@ -107,6 +108,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.notifications,
         builder: (_, __) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.profileAchievements,
+        builder: (_, __) => const AchievementsScreen(),
       ),
     ],
   );
