@@ -92,6 +92,7 @@ void initState() {
   });
 }
 
+
 @override
 Widget build(BuildContext context) {
   final homeState = ref.watch(homeProvider);
@@ -359,6 +360,13 @@ class _TopHeroSection extends StatelessWidget {
     required this.onStreakTap,
   });
 
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -416,7 +424,7 @@ class _TopHeroSection extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'Good morning, $firstName! 👋',
+                                '${_getGreeting()}, $firstName! 👋',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
