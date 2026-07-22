@@ -130,17 +130,28 @@ export const gamificationService = {
 
     // Level-up notification + socket
     if (leveledUp) {
-      await notificationService.sendToUser(userId, {
-        type: 'level_up',
-        title: `Level Up! 🎉`,
-        body: `You reached Level ${newLevel}! Keep going 🚀`,
-        deepLinkScreen: 'Achievements',
-      })
+      // ── Dedup guard: prevent duplicate level-up notifications ──────────────
+      // If another awardXP call already fired a level-up for this exact level
+      // within the last 60 seconds, skip to avoid duplicates.
+      const { redis } = await import('../config/redis.js')
+      const dedupKey = `level_up_sent:${userId}:${newLevel}`
+      const alreadySent = await redis.get(dedupKey)
 
-      emitToUser(userId, SOCKET_EVENTS.LEVEL_UP, {   // ← was STREAK_MILESTONE, wrong event
-        newLevel,
-        xpPoints: newXP,
-      })
+      if (!alreadySent) {
+        await redis.set(dedupKey, '1', 'EX', 60) // expires in 60s
+
+        await notificationService.sendToUser(userId, {
+          type: 'level_up',
+          title: `Level Up! 🎉`,
+          body: `You reached Level ${newLevel}! Keep going 🚀`,
+          deepLinkScreen: 'Achievements',
+        })
+
+        emitToUser(userId, SOCKET_EVENTS.LEVEL_UP, {
+          newLevel,
+          xpPoints: newXP,
+        })
+      }
     }
 
     return { xpPoints: newXP, level: newLevel, leveledUp }
