@@ -134,7 +134,7 @@ export const gamificationService = {
         type: 'level_up',
         title: `Level Up! 🎉`,
         body: `You reached Level ${newLevel}! Keep going 🚀`,
-        deepLinkScreen: 'Profile',
+        deepLinkScreen: 'Achievements',
       })
 
       emitToUser(userId, SOCKET_EVENTS.LEVEL_UP, {   // ← was STREAK_MILESTONE, wrong event
