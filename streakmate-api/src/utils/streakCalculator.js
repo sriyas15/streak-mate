@@ -37,7 +37,7 @@ export const calcStreakFromDates = (dates) => {
  * dayLogs: [{ date: "YYYY-MM-DD", isProductiveDay, isFreezeDay, isCheatDay }]
  * Returns: { currentStreak, bestStreak, currentStreakStart, bestStreakStart, bestStreakEnd }
  */
-export const calcStreakFromLogs = (dayLogs) => {
+export const calcStreakFromLogs = (dayLogs, todayStr) => {
   if (!dayLogs || dayLogs.length === 0) {
     return {
       currentStreak: 0,
@@ -63,6 +63,9 @@ export const calcStreakFromLogs = (dayLogs) => {
     const isGood = log.isProductiveDay || log.isFreezeDay || log.isCheatDay
 
     if (!isGood) {
+      if (todayStr && log.date === todayStr) {
+        continue
+      }
       // Streak broken — reset run
       if (runCount > bestStreak) {
         bestStreak = runCount

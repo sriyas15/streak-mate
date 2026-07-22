@@ -7,6 +7,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
 import '../../../models/remote/notification_model.dart';
 import '../../../providers/notification_provider.dart';
+import '../../../providers/home_provider.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -62,8 +63,8 @@ class _NotificationsScreenState
       case 'friend_accepted':
       case 'friend_nudge':
       case 'friend_streak_overtake':
+        ref.read(homeTabIndexProvider.notifier).state = 3; // Friends nav index
         context.pop();
-        // Friends is a tab in HomeScreen — handled by HomeScreen index
         break;
 
       // case 'leaderboard_change':

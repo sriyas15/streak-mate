@@ -317,10 +317,16 @@ class _CalendarGrid extends StatelessWidget {
 
             if (isFuture) {
               status = DayStatus.future;
+            } else if (cellDate == todayOnly) {
+              status = (dayData != null &&
+                      (dayData.status == DayStatus.completed ||
+                          dayData.status == DayStatus.partial ||
+                          dayData.status == DayStatus.freeze ||
+                          dayData.status == DayStatus.cheat))
+                  ? dayData.status
+                  : DayStatus.today;
             } else if (dayData != null) {
               status = dayData.status;
-            } else if (cellDate == todayOnly) {
-              status = DayStatus.today;
             } else {
               status = DayStatus.missed;
             }
@@ -619,6 +625,7 @@ class _DayDetailSheet extends ConsumerWidget {
                 const Spacer(),
                 if (detail != null)
                   _StatusBadge(
+                      date: date,
                       productive: detail.isProductiveDay,
                       score: detail.productivityScore),
               ],
@@ -730,31 +737,41 @@ class _DayDetailSheet extends ConsumerWidget {
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.productive, required this.score});
+  const _StatusBadge({required this.date, required this.productive, required this.score});
+  final String date;
   final bool productive;
   final int score;
 
   @override
   Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final isToday = date == todayStr;
+    final isInProgress = isToday && !productive;
+
+    final color = productive
+        ? AppColors.success
+        : (isInProgress ? AppColors.flameOrange : AppColors.danger);
+        
+    final label = productive
+        ? '✅ Productive'
+        : (isInProgress ? '⏳ In Progress' : '❌ Missed');
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: productive
-            ? AppColors.success.withOpacity(0.15)
-            : AppColors.danger.withOpacity(0.12),
+        color: color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: productive
-              ? AppColors.success.withOpacity(0.4)
-              : AppColors.danger.withOpacity(0.3),
+          color: color.withOpacity(0.4),
         ),
       ),
       child: Text(
-        productive ? '✅ Productive' : '❌ Missed',
+        label,
         style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: productive ? AppColors.success : AppColors.danger),
+            color: color),
       ),
     );
   }

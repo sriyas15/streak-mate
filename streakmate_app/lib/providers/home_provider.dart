@@ -276,3 +276,5 @@ final homeRepositoryProvider =
 final homeProvider = StateNotifierProvider<HomeNotifier, HomeState>((ref) {
   return HomeNotifier(ref.watch(homeRepositoryProvider), ref);
 });
+
+final homeTabIndexProvider = StateProvider<int>((ref) => 0);

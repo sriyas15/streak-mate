@@ -10,6 +10,7 @@ import 'core/theme/dark_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/notification_provider.dart';
 import 'core/socket/socket_service.dart';
+import 'providers/home_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -111,37 +112,38 @@ class _StreakMateAppState extends ConsumerState<StreakMateApp> {
   }
 
   void _handleNotificationTap(String type) {
-    final router = ref.read(routerProvider);
+    debugPrint('[Notif] handleNotificationTap called with type: "$type"');
+  final router = ref.read(routerProvider);
 
-    switch (type) {
-      case 'achievement_unlocked':
-      case 'level_up':
-      case 'xp_earned':
-        router.push(RouteNames.profileAchievements);
-        break;
+  switch (type) {
+    case 'achievement_unlocked':
+    case 'level_up':
+    case 'xp_earned':
+      router.push(RouteNames.profileAchievements);
+      break;
 
-      // case 'leaderboard_change':
-      // case 'friend_streak_overtake':
-      //   router.push(RouteNames.leaderboard);
-      //   break;
+    case 'friend_request':
+    case 'friend_accepted':
+      ref.read(homeTabIndexProvider.notifier).state = 3; // Friends nav index
+      router.go(RouteNames.home);
+      break;
 
-      case 'weekly_summary':
-      case 'monthly_report':
-        router.push(RouteNames.profileInsights);
-        break;
+    case 'weekly_summary':
+    case 'monthly_report':
+      router.push(RouteNames.profileInsights);
+      break;
 
-      case 'freeze_used':
-      case 'cheat_day_used':
-      case 'freeze_running_low':
-        router.push(RouteNames.profileFreeze);
-        break;
+    case 'freeze_used':
+    case 'cheat_day_used':
+    case 'freeze_running_low':
+      router.push(RouteNames.profileFreeze);
+      break;
 
-      // Everything else → notifications screen
-      default:
-        router.push(RouteNames.notifications);
-        break;
-    }
+    default:
+      router.push(RouteNames.notifications);
+      break;
   }
+}
 
   @override
   Widget build(BuildContext context) {

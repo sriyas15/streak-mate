@@ -297,14 +297,18 @@ handleUnproductiveDay: async (userId, date) => {
 },
 
   // ── Full recalculate (used after freeze/cheat day) ───────────────
-  // Walks ALL DayLog records and correctly handles gaps (missed days
+  // Walk ALL DayLog records and correctly handles gaps (missed days
   // with no DayLog entry reset the streak to 0)
   recalculate: async (userId) => {
+    const user = await User.findById(userId).select('timezone').lean()
+    const tz = user?.timezone || 'Asia/Kolkata'
+
     const logs = await DayLog.find({ userId })
       .sort({ date: 1 })
       .select('date isProductiveDay isFreezeDay isCheatDay')
       .lean()
 
+    const today = getTodayDate(tz)
     let currentStreak = 0
     let bestStreak = 0
     let streakStart = null
@@ -314,6 +318,10 @@ handleUnproductiveDay: async (userId, date) => {
       const isGoodDay = log.isProductiveDay || log.isFreezeDay || log.isCheatDay
 
       if (!isGoodDay) {
+        if (log.date === today) {
+          // Today is still in progress — an incomplete DayLog for today does NOT break/reset streak
+          continue
+        }
         // Bad day in DayLog — reset streak
         if (currentStreak > bestStreak) bestStreak = currentStreak
         currentStreak = 0
@@ -346,7 +354,6 @@ handleUnproductiveDay: async (userId, date) => {
     // If the last good day was more than 1 day ago (with no DayLog
     // entries bridging the gap), reset to 0
     if (prevDate) {
-      const today = getTodayDate()
       const gapFromLastGoodDay = daysBetween(prevDate, today)
       if (gapFromLastGoodDay > 1) {
         // There are unlogged missed days between last good day and today
@@ -369,6 +376,7 @@ handleUnproductiveDay: async (userId, date) => {
       {
         currentStreakCount: currentStreak,
         currentStreakStart: streakStart,
+        currentStreakEnd: prevDate, // Set the end date to the last good day
         bestStreakCount: bestStreak,
         lastUpdated: new Date(),
       },

@@ -34,7 +34,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  int _currentIndex = 0;
   final List<Widget> _tabs = const [
     _HomeTab(),
     JourneyScreen(),
@@ -43,7 +42,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ProfileScreen(),
   ];
 
-  // Maps bottom-nav tap index to _tabs index
   int _tabIndex(int navIndex) {
     if (navIndex <= 1) return navIndex;
     return navIndex - 1; // 3→2, 4→3
@@ -51,15 +49,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = ref.watch(homeTabIndexProvider);
+
     return Scaffold(
       backgroundColor: AppColors.darkBg,
       body: IndexedStack(
-        index: _tabIndex(_currentIndex),
+        index: _tabIndex(currentIndex),
         children: _tabs,
       ),
       bottomNavigationBar: AppBottomNavBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        currentIndex: currentIndex,
+        onTap: (index) => ref.read(homeTabIndexProvider.notifier).state = index,
         onAddTap: () async {
           final added = await Navigator.push<bool>(
             context,

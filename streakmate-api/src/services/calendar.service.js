@@ -1,4 +1,4 @@
-import { DayLog, HabitLog, Habit } from "../models/index.js";
+import { DayLog, HabitLog, Habit, User } from "../models/index.js";
 import {
   getMonthRange,
   getTodayDate,
@@ -34,10 +34,12 @@ export const calendarService = {
     }
 
     const days = {}
-    const todayStr = getTodayDate()
+    const user = await User.findById(userId).select('timezone').lean()
+    const tz = user?.timezone || 'Asia/Kolkata'
+    const todayStr = getTodayDate(tz)
 
     // Walk dates as strings via noon-UTC parsing — avoids server-timezone
-    // drift between this loop and getTodayDate()'s Asia/Kolkata calculation
+    // drift between this loop and getTodayDate's timezone calculation
     let d = new Date(from + 'T12:00:00Z')
     const end = new Date(to + 'T12:00:00Z')
 
@@ -65,8 +67,8 @@ export const calendarService = {
         else if (dl.isCheatDay) status = 'cheat'
         else if (dl.isProductiveDay) status = 'completed'
         else if (dl.productivityScore > 0) status = 'partial'
-        else if (dl.resolvedAt) status = 'missed'
         else if (dateStr === todayStr) status = 'today'
+        else if (dl.resolvedAt) status = 'missed'
       } else if (dateStr === todayStr) {
         status = 'today'
       } else if (dateStr < todayStr) {
@@ -145,7 +147,9 @@ export const calendarService = {
   // ── Streak chain map (for visual chain rendering) ────────────────
   getStreakMap: async (userId) => {
     // Returns last 90 days as a chain: consecutive productive days highlighted
-    const today = getTodayDate();
+    const user = await User.findById(userId).select('timezone').lean()
+    const tz = user?.timezone || 'Asia/Kolkata'
+    const today = getTodayDate(tz);
     const from = new Date();
     from.setDate(from.getDate() - 89);
     const fromStr = from.toISOString().split("T")[0];
