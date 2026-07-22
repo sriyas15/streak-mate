@@ -172,10 +172,10 @@ export const dayLogService = {
     // If it just became a productive day — update streak
     if (isProductiveDay) {
       await streakService.handleProductiveDay(userId, date)
-      emitToUser(userId, SOCKET_EVENTS.STREAK_UPDATED, { date, productivityScore })
-    }else {
-    await streakService.handleUnproductiveDay(userId, date)
-  }
+      // streak.service already emits STREAK_UPDATED with the full payload
+    } else {
+      await streakService.handleUnproductiveDay(userId, date)
+    }
 
     return dayLog
   },
