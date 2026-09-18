@@ -6,6 +6,7 @@ import '../storage/secure_storage.dart';
 import 'socket_events.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/calendar_provider.dart';
+import '../../providers/home_provider.dart';
 
 class SocketService {
   IO.Socket? _socket;
@@ -82,6 +83,26 @@ class SocketService {
     currentStreakDays: data['currentStreakDays'] as int,
     bestStreakDays: data['bestStreakDays'] as int,
   );
+});
+
+ _socket!.on(SocketEvents.habitCompleted, (data) {
+  debugPrint('[Socket] Habit completed: $data');
+  if (data['currentStreak'] != null) {
+    _ref?.read(homeProvider.notifier).updateHabitStreak(
+      habitId: data['habitId'] as String,
+      currentStreak: data['currentStreak'] as int,
+    );
+  }
+});
+
+ _socket!.on(SocketEvents.habitUncompleted, (data) {
+  debugPrint('[Socket] Habit uncompleted: $data');
+  if (data['currentStreak'] != null) {
+    _ref?.read(homeProvider.notifier).updateHabitStreak(
+      habitId: data['habitId'] as String,
+      currentStreak: data['currentStreak'] as int,
+    );
+  }
 });
 
 }

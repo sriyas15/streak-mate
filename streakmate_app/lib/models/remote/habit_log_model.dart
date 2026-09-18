@@ -143,14 +143,17 @@ class TodayHabitModel {
   bool get isCompleted => todayLog?.isCompleted ?? false;
   int get completionPercentage => todayLog?.completionPercentage ?? 0;
 
-  TodayHabitModel copyWith({HabitLogModel? todayLog}) {
+  TodayHabitModel copyWith({
+    HabitLogModel? todayLog,
+    int? currentStreak,
+  }) {
     return TodayHabitModel(
       id: id,
       name: name,
       icon: icon,
       color: color,
       category: category,
-      currentStreak: currentStreak,
+      currentStreak: currentStreak ?? this.currentStreak,
       bestStreak: bestStreak,
       subtasks: subtasks,
       todayLog: todayLog ?? this.todayLog,

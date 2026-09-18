@@ -5,7 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../models/remote/habit_model.dart';
 
-final _remindersProvider = FutureProvider<List<HabitModel>>((ref) async {
+final _remindersProvider = FutureProvider.autoDispose<List<HabitModel>>((ref) async {
   final r = await DioClient.instance.dio.get('/habits');
   if (r.statusCode == 200) {
     return (r.data['data']['habits'] as List)
@@ -46,6 +46,32 @@ class _HabitRemindersScreenState
       _enabled[habit.id] = value;
       _saving.add(habit.id);
     });
+
+    if (value) {
+      // Automatically prompt for time when turning on
+      final current = _times[habit.id] ?? '08:00';
+      final parts = current.split(':');
+      final initial = TimeOfDay(
+        hour: int.tryParse(parts[0]) ?? 8,
+        minute: int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0,
+      );
+      final picked = await showTimePicker(
+        context: context,
+        initialTime: initial,
+        builder: (c, child) => Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(primary: AppColors.flameOrange),
+          ),
+          child: child!,
+        ),
+      );
+      if (picked != null && mounted) {
+        final formatted =
+            '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+        _times[habit.id] = formatted;
+      }
+    }
+
     try {
       await DioClient.instance.dio.patch(
         '/habits/${habit.id}',
@@ -206,30 +232,46 @@ class _HabitRemindersScreenState
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                     color: AppColors.darkTextPrimary)),
+                            const SizedBox(height: 4),
                             GestureDetector(
                               onTap: enabled
                                   ? () => _pickTime(context, habit)
                                   : null,
-                              child: Row(
-                                children: [
-                                  Icon(Icons.access_time_rounded,
-                                      size: 12,
-                                      color: enabled
-                                          ? color
-                                          : AppColors.darkTextSecondary),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    enabled ? 'Remind at $time' : 'Off',
-                                    style: TextStyle(
-                                        fontSize: 12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: enabled
+                                      ? color.withOpacity(0.1)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.access_time_rounded,
+                                        size: 14,
                                         color: enabled
                                             ? color
-                                            : AppColors.darkTextSecondary,
-                                        fontWeight: enabled
-                                            ? FontWeight.w600
-                                            : FontWeight.w400),
-                                  ),
-                                ],
+                                            : AppColors.darkTextSecondary),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      enabled ? 'Remind at $time' : 'Off',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: enabled
+                                              ? color
+                                              : AppColors.darkTextSecondary,
+                                          fontWeight: enabled
+                                              ? FontWeight.w600
+                                              : FontWeight.w400),
+                                    ),
+                                    if (enabled) ...[
+                                      const SizedBox(width: 4),
+                                      Icon(Icons.edit, size: 10, color: color.withOpacity(0.7)),
+                                    ]
+                                  ],
+                                ),
                               ),
                             ),
                           ],

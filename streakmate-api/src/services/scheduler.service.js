@@ -8,7 +8,7 @@ import { dayLogService } from './dayLog.service.js'
 import { gamificationService } from './gamification.service.js'
 import { achievementService } from './achievement.service.js'
 import { User, Habit, DayLog, Streak } from '../models/index.js'
-import { getTodayDate } from '../utils/dateHelper.js'
+import { getTodayDate, getYesterdayDate } from '../utils/dateHelper.js'
 import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
 
 // ─── Worker factory ──────────────────────────────────────────────────────────
@@ -88,9 +88,7 @@ export const streakWarningWorker = createWorker(
 export const endOfDayWorker = createWorker(
   QUEUE_NAMES.END_OF_DAY,
   async () => {
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    const yesterdayStr = yesterday.toISOString().split('T')[0]
+    const yesterdayStr = getYesterdayDate()
 
     const users = await User.find({
       isActive: true,

@@ -268,6 +268,14 @@ class HomeNotifier extends StateNotifier<HomeState> {
       habits: state.habits.where((h) => h.id != habitId).toList(),
     );
   }
+
+  void updateHabitStreak({required String habitId, required int currentStreak}) {
+    final habits = state.habits.map((h) {
+      if (h.id != habitId) return h;
+      return h.copyWith(currentStreak: currentStreak);
+    }).toList();
+    state = state.copyWith(habits: habits);
+  }
 }
 
 final homeRepositoryProvider =

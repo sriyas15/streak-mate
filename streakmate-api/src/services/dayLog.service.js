@@ -6,9 +6,7 @@ import { emitToUser, SOCKET_EVENTS } from '../socket/index.js'
 export const dayLogService = {
   // ── Get today's daylog (upsert) ──────────────────────────────────
   getToday: async (userId) => {
-    const user = await User.findById(userId).select('timezone').lean()
-    const tz = user?.timezone || 'Asia/Kolkata'
-    const today = getTodayDate(tz)
+    const today = getTodayDate()
     return DayLog.findOneAndUpdate(
       { userId, date: today },
       { $setOnInsert: { userId, date: today } },
@@ -40,10 +38,6 @@ export const dayLogService = {
       date: { $gte: from, $lte: to },
     }).lean()
 
-    const user = await User.findById(userId).select('timezone').lean()
-    const tz = user?.timezone || 'Asia/Kolkata'
-    const todayStr = getTodayDate(tz)
-
     // Map to date → status for easy calendar rendering
     const map = {}
     for (const log of logs) {
@@ -52,7 +46,6 @@ export const dayLogService = {
       else if (log.isCheatDay) status = 'cheat'
       else if (log.isProductiveDay) status = 'completed'
       else if (log.productivityScore > 0) status = 'partial'
-      else if (log.date === todayStr) status = 'today'
       else if (log.resolvedAt) status = 'missed'
 
       map[log.date] = {
@@ -144,26 +137,10 @@ export const dayLogService = {
       { upsert: true, new: true }
     )
 
-    const user = await User.findById(userId).select('timezone').lean()
-    const tz = user?.timezone || 'Asia/Kolkata'
-    const todayStr = getTodayDate(tz)
-    
-    const calStatus = dayLog.isFreezeDay
-      ? 'freeze'
-      : dayLog.isCheatDay
-      ? 'cheat'
-      : isProductiveDay
-      ? 'completed'
-      : productivityScore > 0
-      ? 'partial'
-      : date === todayStr
-      ? 'today'
-      : 'missed'
-
     // After findOneAndUpdate in recalculate:
     emitToUser(userId, SOCKET_EVENTS.CALENDAR_UPDATED, {
       date,
-      status: calStatus,
+      status: dayLog.isFreezeDay ? 'freeze' : dayLog.isCheatDay ? 'cheat' : isProductiveDay ? 'completed' : productivityScore > 0 ? 'partial' : 'missed',
       productivityScore,
       completedHabits,
       totalHabits,
@@ -172,10 +149,10 @@ export const dayLogService = {
     // If it just became a productive day — update streak
     if (isProductiveDay) {
       await streakService.handleProductiveDay(userId, date)
-      // streak.service already emits STREAK_UPDATED with the full payload
-    } else {
-      await streakService.handleUnproductiveDay(userId, date)
-    }
+      emitToUser(userId, SOCKET_EVENTS.STREAK_UPDATED, { date, productivityScore })
+    }else {
+    await streakService.handleUnproductiveDay(userId, date)
+  }
 
     return dayLog
   },
